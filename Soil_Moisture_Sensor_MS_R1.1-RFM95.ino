@@ -29,12 +29,13 @@
  *  -----------  ---  ----------------------------------------------------------
  *  22-Dec-2016 1.0a  TRL - first 
  *  27-Dec-2016 1.1a  TRL - Added DS3232 and Moisture Mux code
+ *  31-Dec-2016 1.1a  TRL - Changed freq to 928.5MHz
  *  
  *
  *  Notes:  1)  Tested with Arduino 1.6.13
  *          2)  Testing using RocketStream M0 with RFM95
  *          3)  Sensor 2 board, Rev2a 
- *          4)  MySensor 2.1b 4 Dec 2016
+ *          4)  MySensor 2.1 30 Dec 2016
  *    
  *    
  *    MCP9800   base I2C address 0x40
@@ -124,7 +125,7 @@
 #define MY_RFM95_TX_POWER               13 // max is 23
 //#define MY_RFM95_ATC_MODE_DISABLED
 #define MY_RFM95_ATC_TARGET_RSSI        (-60)
-#define MY_RFM95_FREQUENCY              (915.0f)
+#define MY_RFM95_FREQUENCY              (928.5f)
 #define SendDelay                       0
 #define AckFlag                         false
 
