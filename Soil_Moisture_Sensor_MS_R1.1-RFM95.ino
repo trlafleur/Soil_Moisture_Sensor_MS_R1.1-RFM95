@@ -55,6 +55,7 @@
 /* ************************************************************************************** */
 // Define's for the board options
 #define R2A                   // Rev 2a of the board
+#define IDsize                  // using only ID0 and ID1
 
 // Select the Temperature and/or Humidity sensor on the board
 //#define Sensor_SI7021       // Using the Si7021 Temp and Humidity sensor
@@ -312,7 +313,9 @@ void before()
      
      myNodeID  = !digitalRead (ID0);                     // ID bit are 0 = on, so we invert them
      myNodeID |= (!digitalRead(ID1) << 1);
-     myNodeID |= (!digitalRead(ID2) << 2);
+    #ifndef IDsize                                        // using only ID0 and ID1
+      myNodeID |= (!digitalRead(ID2) << 2);
+    #endif
      myNodeID += NodeID_Base; 
 
     // Pin for onboard LED
