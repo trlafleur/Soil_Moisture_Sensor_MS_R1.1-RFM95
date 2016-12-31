@@ -55,16 +55,16 @@
 /* ************************************************************************************** */
 // Define's for the board options
 #define R2A                   // Rev 2a of the board
-#define IDsize                  // using only ID0 and ID1
+#define IDsize                // using only ID0 and ID1
 
 // Select the Temperature and/or Humidity sensor on the board
-//#define Sensor_SI7021       // Using the Si7021 Temp and Humidity sensor
+//#define Sensor_SI7021         // Using the Si7021 Temp and Humidity sensor
 //#define Sensor_MCP9800        // Using the MCP9800 temp sensor
-//#define WaterPressure       // if we have a water pressure sensor
+//#define WaterPressure         // if we have a water pressure sensor
 
-//#define MyWDT               // Watch Dog Timer
+//#define MyWDT                 // Watch Dog Timer
 #define MoistureSensor        // Moisture Sensor, 4 channels
-#define MyDS3231               // DS3231 RTC
+#define MyDS3231              // DS3231 RTC
 
 #define MY_SERIALDEVICE Serial  // this will override Serial port define in MyHwSAMD.h file
 
@@ -142,7 +142,7 @@
 #define MY_DEFAULT_TX_LED_PIN     12              // Led's on the board
 #define MY_DEFAULT_ERR_LED_PIN    10
 #define MY_DEFAULT_RX_LED_PIN     11
-#define OnBoardLed                13              // Cpu Led
+#define OnBoardLed                13              // CPU Led
 
 #define MY_WITH_LEDS_BLINKING_INVERSE
 
