@@ -50,7 +50,7 @@
  *            Set correct alarms time and functions
  *            Send current time to board
  *    
- *    
+ *    Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
  */
 /* ************************************************************************************** */
 // Define's for the board options
