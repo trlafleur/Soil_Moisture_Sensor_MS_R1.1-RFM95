@@ -428,6 +428,30 @@ void presentation()
  }
 
 
+
+/* **************** Initializes the CPU sleep mode. ******************* */
+void initSleep()
+{
+    // Set the sleep mode
+    SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
+}
+
+/* **************** System Sleep ******************* */
+void systemSleep()
+{
+    // check processor type...
+    // put led, radio and flash to sleep
+
+    // go to sleep
+    
+            interrupts();     // make sure interrupts are on...
+            __WFI();          // SAMD sleep
+            //  .... we will wake up from sleeping if triggered after the interrupt
+            interrupts();     // make sure interrupts are on...
+
+            // if afterwakeup, we need to bring alive the radio ect...
+}
+
 /* **************** DS3231 Alarm ******************* */
 #if defined MyDS3231
 void ClockAlarm()
