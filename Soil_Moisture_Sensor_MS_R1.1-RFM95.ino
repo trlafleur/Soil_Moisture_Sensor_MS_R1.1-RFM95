@@ -8,7 +8,7 @@
  *    DS3232 RTC + Temperature
  *  
  *  Water from a pressure transducer, 0 to 5v
- *    Input fron sensor is scaled by .6577, 5.0v * .6577 = 3.288v
+ *    Input from sensor is scaled by .6577, 5.0v * .6577 = 3.288v
  *    (10.2k and a 19.6k resistor, flitered with a .1uf cap)
  *   
  *  Output: 0.5V – 4.5V linear voltage output. 0 psi outputs 0.5V, 50 psi outputs 2.5V, 100 psi outputs 4.5V 
@@ -20,7 +20,7 @@
  *
  *    Max6816 is used as an option on Rev2a board to de-bounce the flow reed switch on the meter
  *    The switch must be stable for 40ms to get an output, this limits the max
- *    rate this device can support to less than 15Hz or so.
+ *    rate this device can support to less than 20Hz or so.
  *
  *
  * CHANGE LOG:
@@ -30,7 +30,7 @@
  *  22-Dec-2016 1.0a  TRL - first 
  *  27-Dec-2016 1.1a  TRL - Added DS3232 and Moisture Mux code
  *  31-Dec-2016 1.1a  TRL - Changed freq to 928.5MHz
- *  
+ *  04-Jan-2017 1.1b  TRL - Adding Sleep and WDT code 
  *
  *  Notes:  1)  Tested with Arduino 1.6.13
  *          2)  Testing using RocketStream M0 with RFM95
@@ -55,7 +55,7 @@
 /* ************************************************************************************** */
 // Define's for the board options
 #define R2A                   // Rev 2a of the board
-#define IDsize                // using only ID0 and ID1
+#define IDsize2               // using only ID0 and ID1
 
 // Select the Temperature and/or Humidity sensor on the board
 //#define Sensor_SI7021         // Using the Si7021 Temp and Humidity sensor
@@ -71,6 +71,7 @@
 /* ************************************************************************************** */
 #include <Arduino.h>
 #include <Wire.h>
+
 
 #if defined MyDS3231
     #include <DS3231.h>
@@ -193,7 +194,7 @@ int myNodeID =                0;        // Set at run time from jumpers on PCB
 // All #define above need to be prior to the #include <MySensors.h> below
 #include <MySensors.h>
 /* ************************************************************************************** */
-
+#include <../MySensors_2.1/core/MyTransport.h>
 
 /* ************************************************************************************** */
 #define PressPin      A4                            // Pressure sensor is on analog input, 0 to 100psi
@@ -314,7 +315,7 @@ void before()
      
      myNodeID  = !digitalRead (ID0);                     // ID bit are 0 = on, so we invert them
      myNodeID |= (!digitalRead(ID1) << 1);
-    #ifndef IDsize                                        // using only ID0 and ID1
+    #ifndef IDsize2                                      // using only ID0 and ID1
       myNodeID |= (!digitalRead(ID2) << 2);
     #endif
      myNodeID += NodeID_Base; 
@@ -359,10 +360,9 @@ void setup()
   debug1(PSTR(" My Node ID: %u\n\n"), myNodeID);
   
   // set up ATD and reference, for ATD to use:
-  //analogReference(AR_EXTERNAL);
-  //analogReference(AR_INT1V);
-  //analogReference(AR_EXTERNAL);
-
+  // analogReference(AR_EXTERNAL);
+  // options --> AR_DEFAULT, AR_INTERNAL, AR_EXTERNAL, AR_INTERNAL1V0, AR_INTERNAL1V65, AR_INTERNAL2V23
+      analogReference(AR_INTERNAL);
       analogReadResolution(12);
 
 #if defined Sensor_SI7021
@@ -418,7 +418,7 @@ void setup()
   clock.setAlarm2(0, 0, myNodeID, DS3231_MATCH_M);
 
   // Attach Interrput.  DS3231 INT is connected to Pin 38
-  attachInterrupt(38, ClockAlarm, LOW);                   // please note that RISING and FALLING do NOT work on current Zero code base
+  attachInterrupt(38, ClockAlarm, LOW);                   // please note that RISING and FALLING do NOT work on current Zero code base in sleep 
 
 #endif
 
@@ -474,13 +474,20 @@ void printCpuResetCause()
     if (PM->RCAUSE.bit.POR) {
         debug1(PSTR(" Power On Reset"));
     }
-
-    debug1(PSTR(" [ %u ]\n"), PM->RCAUSE.reg);
+    char txtBuffer[30];
+    debug1((" [ %u ]\n"), PM->RCAUSE.reg);
+    sprintf(txtBuffer,"CPU Reset: [ %u ]\n", PM->RCAUSE.reg);
+    //debug1(txtBuffer);
+    send(TextMsg.set(txtBuffer), AckFlag);  wait(SendDelay); 
+    
 }
 
 /* **************** System Sleep ******************* */
 void systemSleep()
 {
+    
+    debug1(PSTR("*** Going to Sleep ***\n"));
+    delay (100);
     // put led, radio and flash to sleep
     // Turn off LED's
     pinMode (MY_DEFAULT_TX_LED_PIN, INPUT);
@@ -490,13 +497,14 @@ void systemSleep()
     // Put Flash to sleep
 
     // Put Radio to Sleep
-    
+    transportPowerDown();
     
     interrupts();                       // make sure interrupts are on...
     LowPower.standby();                 // SAMD sleep
-                                        //  .... we will wake up from sleeping if triggered after the interrupt
+       //  .... we will wake up from sleeping if triggered after the interrupt
                                         // if after-wake-up, we need to bring alive the radio ect...
 
+    interrupts();                        // make sure interrupts are on...
     // re enable LED's if needed
     pinMode (MY_DEFAULT_TX_LED_PIN, OUTPUT);
     pinMode (MY_DEFAULT_RX_LED_PIN, OUTPUT);
@@ -506,10 +514,13 @@ void systemSleep()
     // wake up Flash if needed
 
     // wake up Radio from Sleep
+    transportInit();
 
-    delay (200);                         // give radio some time to wake up
+    debug1(PSTR("*** Waking From Sleep ***\n"));
+    
+    //delay (200);                         // give radio some time to wake up
 
-    interrupts();                        // make sure interrupts are on...
+
 }
 
 /* **************** DS3231 Alarm ******************* */
@@ -519,13 +530,13 @@ void ClockAlarm()
   if (clock.isAlarm1(false))      // is set to true, will also clear the alarm..
   {
     clock.clearAlarm1();
-    //debug1(PSTR("*** Alarm 1 ***\n"));
+    debug1(PSTR("*** Alarm 1 ***\n"));
   }
 
   if (clock.isAlarm2(false))
   {
     clock.clearAlarm2();
-    //debug1(PSTR("*** Alarm 2 ***\n"));
+    debug1(PSTR("*** Alarm 2 ***\n"));
   }
 }
 #endif
@@ -651,7 +662,7 @@ void loop()
   currentTime = millis();                                       // get the current time
 
  /* ***************** Send  ***************** */
-  if (currentTime - lastSendTime >= SEND_FREQUENCY)             // Only send values at a maximum rate  
+ // if (currentTime - lastSendTime >= SEND_FREQUENCY)             // Only send values at a maximum rate  
     {
       lastSendTime = currentTime; 
       
@@ -668,8 +679,9 @@ void loop()
      SendKeepAlive(); 
 
   #ifdef MyDS3231
-    //LowPower.standby();
-    //LowPower.idle(IDLE_2); 
+    delay (10000);
+    systemSleep();
+    debug1(PSTR("*** Wakeing From Sleep in Loop ***\n"));
   #endif
                        
 }   // end of loop
