@@ -39,7 +39,7 @@ void wdt_enable(wdt_period period)
 
 #elif defined(ARDUINO_ARCH_SAMD)
 
-  // Here we use normal mode with  the early warning interrupt
+  // Here we use normal mode with the early warning interrupt
   // enabled. The early warning period is defined by the parameter
   // 'period' and the reset is set to twice that value.
 

@@ -134,7 +134,7 @@
 // Select correct defaults for the processor and board we are using
 #ifdef __SAMD21G18A__                 // useing an ARM M0 Processsor, Zero, Feather M0, RocketScream Mini Pro
 //#ifdef defined(ARDUINO_ARCH_SAMD)
-#warning Using an ARM M0 SAMD21G18A Processsor
+#warning Requires an ARM M0 SAMD21G18A Processsor
 
 //#define MY_RFM95_RST_PIN        RFM95_RST_PIN
 #define MY_RFM95_IRQ_PIN          2               // IRQ
@@ -239,6 +239,7 @@ void soilsensors();
 void measureSensor();
 void addReading(long resistance);
 long average();
+void printCpuResetCause();
 
 /* ************************************************************************************** */
 unsigned long SEND_FREQUENCY        = 15000;      // Minimum time between send (in milliseconds). We don't want to spam the gateway.
@@ -321,6 +322,11 @@ void before()
     // Pin for onboard LED
     pinMode(OnBoardLed, OUTPUT);
     digitalWrite(OnBoardLed, LOW);
+
+     // No longer need these pins, so remove pullups to save power
+     pinMode(ID0, INPUT);
+     pinMode(ID1, INPUT);
+     pinMode(ID2, INPUT);
 }
 
 
@@ -380,7 +386,11 @@ void setup()
   // Pin MuxA,MuxB are for selecting sensor 1-4
   pinMode(MuxA, OUTPUT);  // Mux input A
   pinMode(MuxB, OUTPUT);  // Mux input B 
+
+  printCpuResetCause();
 #endif 
+
+
 
 /* ******** This setup the DS3231 and its alarms ********* */
 #if defined MyDS3231
@@ -428,28 +438,78 @@ void presentation()
  }
 
 
-
-/* **************** Initializes the CPU sleep mode. ******************* */
-void initSleep()
+/* **************************************************************************** 
+ * 
+ * Prints the cause of the last reset
+ * It uses the PM->RCAUSE register to detect the cause of the last reset.
+ *
+ * **************************************************************************** */
+void printCpuResetCause()
 {
-    // Set the sleep mode
-    SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
+    debug1(PSTR("***CPU reset by"));
+
+    if (PM->RCAUSE.bit.SYST) {
+        debug1(PSTR(" Software"));
+    }
+
+    // Syntax error due to #define WDT in CMSIS/4.0.0-atmel/Device/ATMEL/samd21/include/samd21j18a.h
+    // if (PM->RCAUSE.bit.WDT) {
+    if ((PM->RCAUSE.reg & PM_RCAUSE_WDT) != 0) {
+
+        debug1(PSTR(" Watchdog"));
+    }
+
+    if (PM->RCAUSE.bit.EXT) {
+        debug1(PSTR(" External"));
+    }
+
+    if (PM->RCAUSE.bit.BOD33) {
+        debug1(PSTR(" BOD33"));
+    }
+
+    if (PM->RCAUSE.bit.BOD12) {
+        debug1(PSTR(" BOD12"));
+    }
+
+    if (PM->RCAUSE.bit.POR) {
+        debug1(PSTR(" Power On Reset"));
+    }
+
+    debug1(PSTR(" [ %u ]\n"), PM->RCAUSE.reg);
 }
 
 /* **************** System Sleep ******************* */
 void systemSleep()
 {
-    // check processor type...
     // put led, radio and flash to sleep
+    // Turn off LED's
+    pinMode (MY_DEFAULT_TX_LED_PIN, INPUT);
+    pinMode (MY_DEFAULT_RX_LED_PIN, INPUT);
+    pinMode (MY_DEFAULT_ERR_LED_PIN, INPUT);
+    pinMode (OnBoardLed, INPUT); 
+    // Put Flash to sleep
 
-    // go to sleep
+    // Put Radio to Sleep
     
-            interrupts();     // make sure interrupts are on...
-            __WFI();          // SAMD sleep
-            //  .... we will wake up from sleeping if triggered after the interrupt
-            interrupts();     // make sure interrupts are on...
+    
+    interrupts();                       // make sure interrupts are on...
+    LowPower.standby();                 // SAMD sleep
+                                        //  .... we will wake up from sleeping if triggered after the interrupt
+                                        // if after-wake-up, we need to bring alive the radio ect...
 
-            // if afterwakeup, we need to bring alive the radio ect...
+    // re enable LED's if needed
+    pinMode (MY_DEFAULT_TX_LED_PIN, OUTPUT);
+    pinMode (MY_DEFAULT_RX_LED_PIN, OUTPUT);
+    pinMode (MY_DEFAULT_ERR_LED_PIN, OUTPUT);
+    pinMode (OnBoardLed, OUTPUT);  
+
+    // wake up Flash if needed
+
+    // wake up Radio from Sleep
+
+    delay (200);                         // give radio some time to wake up
+
+    interrupts();                        // make sure interrupts are on...
 }
 
 /* **************** DS3231 Alarm ******************* */
