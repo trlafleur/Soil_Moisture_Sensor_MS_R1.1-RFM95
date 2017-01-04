@@ -487,7 +487,7 @@ void systemSleep()
 {
     
     debug1(PSTR("*** Going to Sleep ***\n"));
-    delay (100);
+    wait (100);
     // put led, radio and flash to sleep
     // Turn off LED's
     pinMode (MY_DEFAULT_TX_LED_PIN, INPUT);
@@ -518,16 +518,17 @@ void systemSleep()
 
     debug1(PSTR("*** Waking From Sleep ***\n"));
     
-    //delay (200);                         // give radio some time to wake up
+    //wait (200);                         // give radio some time to wake up
 
 
 }
 
-/* **************** DS3231 Alarm ******************* */
+/* **************** DS3231 Alarm Interrupt ******************* */
+// We do nothing here except reset the interrupt source
 #if defined MyDS3231
 void ClockAlarm()
 {
-  if (clock.isAlarm1(false))      // is set to true, will also clear the alarm..
+  if (clock.isAlarm1(false))              // is set to true, will also clear the alarm..
   {
     clock.clearAlarm1();
     debug1(PSTR("*** Alarm 1 ***\n"));
@@ -619,9 +620,9 @@ void  getTempMCP9800 ()
 /* ***************** Send DS3231 Temp ***************** */
 void getTempDS3231()
 {
-     #if defined  Sensor_MCP9800 || defined Sensor_SI7021       // we will used other Temp sensor if avilable
+   #if defined  Sensor_MCP9800 || defined Sensor_SI7021       // we will used other Temp sensor if avilable
         // nothing here
-     #elif defined MyDS3231
+   #elif defined MyDS3231
       clock.forceConversion();                                  // Start conversion of Temp sensor
       wait(25);
       temp = clock.readTemperature();
@@ -632,24 +633,21 @@ void getTempDS3231()
         
       send(TempMsg.set(temp, 2), AckFlag);  wait(SendDelay);
 
-     #endif
+   #endif
 }
 
 
 /* ***************** Send Keep Alive ***************** */
 void SendKeepAlive()
 {
-  if (currentTime - keepaliveTime >= KEEPALIVE_FREQUENCY)
-    {
           debug1(PSTR("***Sending Heart Beat\n"));
           sendHeartbeat();  wait(SendDelay);
 
           SendPressure();                                               // send water pressure to GW if we have it
-          getTempSi7021();
-          getTempMCP9800();
-          getTempDS3231();
+          getTempSi7021();                                              // send Temp and Humitty to GW if we have it
+          getTempMCP9800();                                             // send Temp to GW if we have it
+          getTempDS3231();                                              // send Temp to GW if we have it
           keepaliveTime = currentTime;                                  // reset timer
-    }  
 }
 
 
@@ -662,27 +660,30 @@ void loop()
   currentTime = millis();                                       // get the current time
 
  /* ***************** Send  ***************** */
- // if (currentTime - lastSendTime >= SEND_FREQUENCY)             // Only send values at a maximum rate  
+#ifndef  MyDS3231
+    if (currentTime - lastSendTime >= SEND_FREQUENCY)           // Only send values at a maximum rate 
+#endif 
     {
       lastSendTime = currentTime; 
       
       soilsensors(); 
-      int vbat = analogRead(5);
+      int vbat = analogRead(A5);
       float Vsys =  vbat * 0.000805861 * 1.97;                  // read the battery voltage, 12bits = 0 -> 4095, divider is 1/2
       send(VBAT.set(Vsys, 2), AckFlag);  wait(SendDelay);
       sendBatteryLevel(vbat/41);  wait (SendDelay);             // Sent MySensor battery in %, count / 41 = 4095/41 = 99%
       floatMSB = Vsys * 100;                                    // we donot have floating point printing in debug print
       floatR = floatMSB % 100; 
       debug1(PSTR("Vbat: %0u.%02uV \n"), floatMSB/100, floatR);
-    
-    }
-     SendKeepAlive(); 
 
-  #ifdef MyDS3231
-    delay (10000);
+      SendKeepAlive();  
+    }
+     
+
+#ifdef MyDS3231
+    wait (10000);                                              // Stay awake time
     systemSleep();
     debug1(PSTR("*** Wakeing From Sleep in Loop ***\n"));
-  #endif
+#endif
                        
 }   // end of loop
 
@@ -840,7 +841,7 @@ void measureSensor()
         if (resistance >= 100000) resistance = 100000;  // 100k max
         
        addReading(resistance);                // save it
-       delay(100);
+       wait(100);
       } 
 }
 
