@@ -141,7 +141,7 @@ const bool MySendTime[24] = {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 // Select correct defaults for the processor and board we are using
 #ifdef __SAMD21G18A__                 // useing an ARM M0 Processsor, Zero, Feather M0, RocketScream Mini Pro
 //#ifdef defined(ARDUINO_ARCH_SAMD)
-#warning Requires an ARM M0 SAMD21G18A Processsor
+//#warning Requires an ARM M0 SAMD21G18A Processsor
 
 //#define MY_RFM95_RST_PIN        RFM95_RST_PIN
 #define MY_RFM95_IRQ_PIN          2               // IRQ
@@ -160,7 +160,7 @@ const bool MySendTime[24] = {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 #define ID2                         6
 
 #else
-  #error ********* Processor not defined
+  #error ********* Processor not defined, Requires an ARM M0 SAMD21G18A
 #endif
 
 
@@ -665,7 +665,7 @@ void loop()
     if (MySendTime[dt.hour] == 1)                              // see if it time to send data
 #endif
     {
-      debug1(PSTR("\n*** Sending Sensor Data ***\n")); 
+      debug1(PSTR("\n*** Sending Sensor Data at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);   
       lastSendTime = currentTime; 
       
       soilsensors(); 
@@ -685,7 +685,7 @@ void loop()
      wait (10000);                                             // Stay awake time
         systemSleep();
      dt =  clock.getDateTime();                                // get current time from DS3231 
-     debug1(PSTR("*** Wakeing From Sleep at: %u:%02u\n"), dt.hour, dt.minute);   
+     debug1(PSTR("*** Wakeing From Sleep at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);   
 #endif
                        
 }   // end of loop 
