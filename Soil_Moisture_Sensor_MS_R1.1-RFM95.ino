@@ -365,6 +365,8 @@ void setup()
   const char compile_date[]  = __DATE__ ", " __TIME__;
   debug1(PSTR(" %s \n\n"), compile_date);
   debug1(PSTR(" My Node ID: %u\n\n"), myNodeID);
+
+  printCpuResetCause();
   
   // set up ATD and reference, for ATD to use:
   // analogReference(AR_EXTERNAL);
@@ -394,7 +396,7 @@ void setup()
   pinMode(MuxA, OUTPUT);  // Mux input A
   pinMode(MuxB, OUTPUT);  // Mux input B 
 
-  printCpuResetCause();
+  
 #endif 
 
 
@@ -404,7 +406,7 @@ void setup()
   clock.begin();
   clock.enableOutput(false);                                    // set for interrupt on DS3231
   
-  // Disarm alarms and clear alarms for this example, because alarms is battery backed.
+  // Disarm alarms and clear alarms
   // Under normal conditions, the settings should be reset after power and restart microcontroller.
   clock.armAlarm1(false);
   clock.armAlarm2(false);
@@ -420,7 +422,7 @@ void setup()
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
   clock.setAlarm1(0, 0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_S);
 
-  // Set Alarm2 - At "myNodeID" minute past the hour                  // this allow for pseudo-random TX
+  // Set Alarm2 - At "myNodeID" minute past the hour                   // this allow for pseudo-random TX time
   // setAlarm2(Date or Day, Hour, Minute, Mode, Armed = true)
   clock.setAlarm2(0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_M);       // using NodeID to offset wake time and TX
 
