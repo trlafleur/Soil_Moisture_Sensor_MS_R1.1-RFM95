@@ -97,6 +97,12 @@
 #endif 
 
 /* ************************************************************************************** */
+// A bit array define the hour to wake up and send sensor messages...
+//                           0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+const bool MySendTime[24] = {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0};
+
+
+/* ************************************************************************************** */
 // Most of these items below need to be prior to #include <MySensor.h> 
 
 /*  Enable debug prints to serial monitor on port 0 */
@@ -485,7 +491,6 @@ void printCpuResetCause()
 /* **************** System Sleep ******************* */
 void systemSleep()
 {
-    
     debug1(PSTR("*** Going to Sleep ***\n"));
     wait (100);
     // put led, radio and flash to sleep
@@ -513,14 +518,8 @@ void systemSleep()
 
     // wake up Flash if needed
 
-    // wake up Radio from Sleep
+    // wake up MySensor and Radio from Sleep
     transportInit();
-
-    debug1(PSTR("*** Waking From Sleep ***\n"));
-    
-    //wait (200);                         // give radio some time to wake up
-
-
 }
 
 /* **************** DS3231 Alarm Interrupt ******************* */
@@ -531,13 +530,13 @@ void ClockAlarm()
   if (clock.isAlarm1(false))              // is set to true, will also clear the alarm..
   {
     clock.clearAlarm1();
-    debug1(PSTR("*** Alarm 1 ***\n"));
+    //debug1(PSTR("*** Alarm 1 ***\n"));
   }
 
   if (clock.isAlarm2(false))
   {
     clock.clearAlarm2();
-    debug1(PSTR("*** Alarm 2 ***\n"));
+    //debug1(PSTR("*** Alarm 2 ***\n"));
   }
 }
 #endif
@@ -640,7 +639,7 @@ void getTempDS3231()
 /* ***************** Send Keep Alive ***************** */
 void SendKeepAlive()
 {
-          debug1(PSTR("***Sending Heart Beat\n"));
+          
           sendHeartbeat();  wait(SendDelay);
 
           SendPressure();                                               // send water pressure to GW if we have it
@@ -648,6 +647,7 @@ void SendKeepAlive()
           getTempMCP9800();                                             // send Temp to GW if we have it
           getTempDS3231();                                              // send Temp to GW if we have it
           keepaliveTime = currentTime;                                  // reset timer
+          debug1(PSTR("*** Sending Heart Beat ***\n\n"));
 }
 
 
@@ -657,13 +657,17 @@ void SendKeepAlive()
 void loop()     
 { 
   //wdt_reset();
-  currentTime = millis();                                       // get the current time
+   
+    currentTime = millis();                                    
 
  /* ***************** Send  ***************** */
-#ifndef  MyDS3231
-    if (currentTime - lastSendTime >= SEND_FREQUENCY)           // Only send values at a maximum rate 
-#endif 
+//#ifndef  MyDS3231
+//    if (currentTime - lastSendTime >= SEND_FREQUENCY)          // Only send values at a maximum rate 
+//#elseif      
+    if (MySendTime[dt.hour] == 1)                              // see if it time to send data
+//#endif
     {
+      debug1(PSTR("\n*** Sending Sensor Data ***\n")); 
       lastSendTime = currentTime; 
       
       soilsensors(); 
@@ -681,11 +685,12 @@ void loop()
 
 #ifdef MyDS3231
     wait (10000);                                              // Stay awake time
-    systemSleep();
-    debug1(PSTR("*** Wakeing From Sleep in Loop ***\n"));
+      systemSleep();
+     dt =  clock.getDateTime();                                // get current time from DS3231 
+     debug1(PSTR("*** Wakeing From Sleep at: %u:%02u\n"), dt.hour, dt.minute);   
 #endif
                        
-}   // end of loop
+}   // end of loop 
 
 
 /****************** Message Receive Loop *******************
