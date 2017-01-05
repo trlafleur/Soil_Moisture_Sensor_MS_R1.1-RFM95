@@ -493,7 +493,7 @@ void systemSleep()
 {
     debug1(PSTR("*** Going to Sleep ***\n"));
     wait (100);
-    // put led, radio and flash to sleep
+    // put led's, radio and flash to sleep
     // Turn off LED's
     pinMode (MY_DEFAULT_TX_LED_PIN, INPUT);
     pinMode (MY_DEFAULT_RX_LED_PIN, INPUT);
@@ -501,14 +501,13 @@ void systemSleep()
     pinMode (OnBoardLed, INPUT); 
     // Put Flash to sleep
 
-    // Put Radio to Sleep
+    // Put Radio and transport to Sleep
     transportPowerDown();
     
     interrupts();                       // make sure interrupts are on...
     LowPower.standby();                 // SAMD sleep
        //  .... we will wake up from sleeping if triggered after the interrupt
                                         // if after-wake-up, we need to bring alive the radio ect...
-
     interrupts();                        // make sure interrupts are on...
     // re enable LED's if needed
     pinMode (MY_DEFAULT_TX_LED_PIN, OUTPUT);
@@ -638,8 +637,7 @@ void getTempDS3231()
 
 /* ***************** Send Keep Alive ***************** */
 void SendKeepAlive()
-{
-          
+{       
           sendHeartbeat();  wait(SendDelay);
 
           SendPressure();                                               // send water pressure to GW if we have it
@@ -661,11 +659,11 @@ void loop()
     currentTime = millis();                                    
 
  /* ***************** Send  ***************** */
-//#ifndef  MyDS3231
-//    if (currentTime - lastSendTime >= SEND_FREQUENCY)          // Only send values at a maximum rate 
-//#elseif      
+#ifndef  MyDS3231
+    if (currentTime - lastSendTime >= SEND_FREQUENCY)          // Only send values at a maximum rate 
+#else      
     if (MySendTime[dt.hour] == 1)                              // see if it time to send data
-//#endif
+#endif
     {
       debug1(PSTR("\n*** Sending Sensor Data ***\n")); 
       lastSendTime = currentTime; 
@@ -684,8 +682,8 @@ void loop()
      
 
 #ifdef MyDS3231
-    wait (10000);                                              // Stay awake time
-      systemSleep();
+     wait (10000);                                             // Stay awake time
+        systemSleep();
      dt =  clock.getDateTime();                                // get current time from DS3231 
      debug1(PSTR("*** Wakeing From Sleep at: %u:%02u\n"), dt.hour, dt.minute);   
 #endif
@@ -738,7 +736,11 @@ void receive(const MyMessage &message)
 }
 
 
-/* ******************************************************** */
+/* ******************************************************** 
+ *  
+ *  Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
+ *     
+ ********************************************************** */
 void soilsensors()
 {
 // Select sensor 1, and enable MUX
