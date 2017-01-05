@@ -76,6 +76,7 @@
 #if defined MyDS3231
     #include <DS3231.h>
     #include "LowPower.h"
+    #define DS3231Int 38            // Interrupt pin
 #endif
 
 #if defined Sensor_SI7021
@@ -84,23 +85,25 @@
 #endif
 
 #if defined Sensor_MCP9800
-    #include <MCP980X.h>      // http://github.com/JChristensen/MCP980X
+    #include <MCP980X.h>            // http://github.com/JChristensen/MCP980X
     MCP980X MCP9800(0);
 #endif
 
 #if defined MyWDT
-  #include <avr/wdt.h>      // for watch-dog timer support
+  #include <avr/wdt.h>              // for watch-dog timer support
 #endif
 
 #if defined MoistureSensor
   #include <math.h>                 // Conversion equation from resistance to %
 #endif 
 
-/* ************************************************************************************** */
-// A bit array define the hour to wake up and send sensor messages...
-//                           0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+/* ************************************************************************************** 
+ * A bit array to define the hour to wake up and send sensor messages...
+ *  NodeID * 5 % 60 is use for the alarm time within the hour, this offset TX time
+ **************************************************************************************** */
+ //                          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
 const bool MySendTime[24] = {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0};
-
+#define TXoffset 5
 
 /* ************************************************************************************** */
 // Most of these items below need to be prior to #include <MySensor.h> 
@@ -143,21 +146,19 @@ const bool MySendTime[24] = {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 //#ifdef defined(ARDUINO_ARCH_SAMD)
 //#warning Requires an ARM M0 SAMD21G18A Processsor
 
-//#define MY_RFM95_RST_PIN        RFM95_RST_PIN
+//#define MY_RFM95_RST_PIN        0
 #define MY_RFM95_IRQ_PIN          2               // IRQ
 #define MY_RFM95_SPI_CS           5               // NSS
 #define MY_DEFAULT_TX_LED_PIN     12              // Led's on the board
 #define MY_DEFAULT_ERR_LED_PIN    10
 #define MY_DEFAULT_RX_LED_PIN     11
 #define OnBoardLed                13              // CPU Led
-
 #define MY_WITH_LEDS_BLINKING_INVERSE
+#define OnBoardFlash               4              // Flash chip on processor
 
-#define OnBoardFlash                4             // Flash chip on processor
-
-#define ID0                         0             // ID0 pin
-#define ID1                         1
-#define ID2                         6
+#define ID0                        0              // ID pin
+#define ID1                        1
+#define ID2                        6
 
 #else
   #error ********* Processor not defined, Requires an ARM M0 SAMD21G18A
@@ -200,7 +201,7 @@ int myNodeID =                0;        // Set at run time from jumpers on PCB
 // All #define above need to be prior to the #include <MySensors.h> below
 #include <MySensors.h>
 /* ************************************************************************************** */
-#include <../MySensors_2.1/core/MyTransport.h>
+#include <core/MyTransport.h>
 
 /* ************************************************************************************** */
 #define PressPin      A4                            // Pressure sensor is on analog input, 0 to 100psi
@@ -401,7 +402,7 @@ void setup()
 /* ******** This setup the DS3231 and its alarms ********* */
 #if defined MyDS3231
   clock.begin();
-  clock.enableOutput(false);                    // set for interrupt
+  clock.enableOutput(false);                                    // set for interrupt on DS3231
   
   // Disarm alarms and clear alarms for this example, because alarms is battery backed.
   // Under normal conditions, the settings should be reset after power and restart microcontroller.
@@ -417,14 +418,14 @@ void setup()
   // Set our alarms...
   // Set Alarm1 - At  10 second pass the minute
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
-  clock.setAlarm1(0, 0, 0, 10, DS3231_MATCH_S);
+  clock.setAlarm1(0, 0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_S);
 
-  // Set Alarm2 - At "myNodeID" minute past the hour      // this allow for pseudo-random TX
+  // Set Alarm2 - At "myNodeID" minute past the hour                  // this allow for pseudo-random TX
   // setAlarm2(Date or Day, Hour, Minute, Mode, Armed = true)
-  clock.setAlarm2(0, 0, myNodeID, DS3231_MATCH_M);
+  clock.setAlarm2(0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_M);       // using NodeID to offset wake time and TX
 
   // Attach Interrput.  DS3231 INT is connected to Pin 38
-  attachInterrupt(38, ClockAlarm, LOW);                   // please note that RISING and FALLING do NOT work on current Zero code base in sleep 
+  attachInterrupt(DS3231Int, ClockAlarm, LOW);                         // please note that RISING and FALLING do NOT work on current Zero code base in sleep 
 
 #endif
 
@@ -669,7 +670,7 @@ void loop()
       lastSendTime = currentTime; 
       
       soilsensors(); 
-      int vbat = analogRead(A5);
+      int vbat = analogRead(BattVolt);
       float Vsys =  vbat * 0.000805861 * 1.97;                  // read the battery voltage, 12bits = 0 -> 4095, divider is 1/2
       send(VBAT.set(Vsys, 2), AckFlag);  wait(SendDelay);
       sendBatteryLevel(vbat/41);  wait (SendDelay);             // Sent MySensor battery in %, count / 41 = 4095/41 = 99%
