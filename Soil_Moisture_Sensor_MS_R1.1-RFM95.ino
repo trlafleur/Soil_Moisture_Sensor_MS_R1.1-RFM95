@@ -6,6 +6,7 @@
  *    1 Analog In
  *    1 Flow Counter In
  *    DS3232 RTC + Temperature
+ *    DS18B20 Soil Sensor
  *  
  *  Water from a pressure transducer, 0 to 5v
  *    Input from sensor is scaled by .6577, 5.0v * .6577 = 3.288v
@@ -32,7 +33,7 @@
  *  31-Dec-2016 1.1a  TRL - Changed freq to 928.5MHz
  *  04-Jan-2017 1.1b  TRL - Adding Sleep and WDT code 
  *
- *  Notes:  1)  Tested with Arduino 1.6.13
+ *  Notes:  1)  Tested with Arduino 1.8.0
  *          2)  Testing using RocketStream M0 with RFM95
  *          3)  Sensor 2 board, Rev2a 
  *          4)  MySensor 2.1 30 Dec 2016
@@ -43,12 +44,13 @@
  *    DS3231    base I2C address 0x68
  *    EUI64     base I2C address 0x50
  *    
- *    TODO:   RFM95 in sleep mode RFM_Write(0x01,0x00); 
+ *    TODO:   done --> RFM95 and MySensor in sleep mode
  *            Flash in sleep mode
- *            Sleep Mode
+ *            done --> Sleep Mode
  *            WDT
- *            Set correct alarms time and functions
+ *            done -->  Set correct alarms time and functions
  *            Send current time to board
+ *            DS18B20 Soil temp sensor
  *    
  *    Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
  */
@@ -116,7 +118,7 @@ const bool MySendTime[24] = {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 //#define MY_DEBUG2           // used in this program, level 2 debug
 
 #define SKETCHNAME      "Soil Moisture Sensor"
-#define SKETCHVERSION   "1.1a"
+#define SKETCHVERSION   "1.1b"
 
 /* ************************************************************************************** */
 /* Enable and select radio type attached, coding rate and frequency
@@ -137,6 +139,7 @@ const bool MySendTime[24] = {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 //#define MY_RFM95_ATC_MODE_DISABLED
 #define MY_RFM95_ATC_TARGET_RSSI        (-60)
 #define MY_RFM95_FREQUENCY              (928.5f)
+
 #define SendDelay                       0
 #define AckFlag                         false
 
@@ -163,8 +166,6 @@ const bool MySendTime[24] = {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 #else
   #error ********* Processor not defined, Requires an ARM M0 SAMD21G18A
 #endif
-
-
 /* ************************************************************************************** */
 
 //#define MY_REPEATER_FEATURE
@@ -395,11 +396,7 @@ void setup()
   // Pin MuxA,MuxB are for selecting sensor 1-4
   pinMode(MuxA, OUTPUT);  // Mux input A
   pinMode(MuxB, OUTPUT);  // Mux input B 
-
-  
 #endif 
-
-
 
 /* ******** This setup the DS3231 and its alarms ********* */
 #if defined MyDS3231
