@@ -69,17 +69,17 @@
 #define MyDS18B20               // if using a Soil Temp sensor
 //#define MyWDT                 // if using the Watch Dog Timer
 #define MoistureSensor          // if using the Moisture Sensor, 4 channels
-#define MyDS3231                // if using the DS3231 RTC
+//#define MyDS3231                // if using the DS3231 RTC
 
 #define MY_SERIALDEVICE Serial  // this will override Serial port define in MyHwSAMD.h file
 
 /* ************************************************************************************** */
 #include <Arduino.h>
 #include <Wire.h>
+#include "LowPower.h"
 
 #if defined MyDS3231
     #include <DS3231.h>
-    #include "LowPower.h"
     #define DS3231Int 38            // Interrupt pin
 #endif
 
@@ -681,15 +681,6 @@ void getSoilTemp()
 }
 
 
-//#define ONE_WIRE_BUS_1 18       // This is shared with AIN0 port
-//    #define DS1820Baddr     0x44
-//    OneWire oneWire_in(ONE_WIRE_BUS_1);
-//    DallasTemperature SoilTemp(&oneWire_in);
-
-
-
-
-
 /* ***************** Send Keep Alive ***************** */
 void SendKeepAlive()
 {       
@@ -699,6 +690,7 @@ void SendKeepAlive()
           getTempSi7021();                                              // send Temp and Humitty to GW if we have it
           getTempMCP9800();                                             // send Temp to GW if we have it
           getTempDS3231();                                              // send Temp to GW if we have it
+          getSoilTemp();                                                // send Soil Temp if we have it
           keepaliveTime = currentTime;                                  // reset timer
           debug1(PSTR("*** Sending Heart Beat ***\n\n"));
 }
@@ -721,8 +713,10 @@ void loop()
     if (MySendTime[dt.hour] == 1)                              // see if it time to send data
     {
       systemWakeUp();                                          // we have work to do, so wake up radio and transport
-#endif     
-      debug1(PSTR("\n*** Sending Sensor Data at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);   
+     
+      debug1(PSTR("\n*** Sending Sensor Data at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second); 
+#endif
+        
       lastSendTime = currentTime; 
       
       soilsensors(); 
