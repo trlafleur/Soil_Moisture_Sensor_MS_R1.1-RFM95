@@ -28,7 +28,9 @@ https://github.com/trlafleur/Soil_Moisture_Sensor_MS_R1.1-RFM95
 Sensor are made from plaster of paris (gypsum)
 
 http://vanderleevineyard.com/1/post/2012/07/the-vinduino-project-2-making-and-installing-gypsum-soil-moisture-sensors.html
+
 http://www.irrometer.com/sensors.html#wm
+
 https://www.amazon.com/Delmhorst-GB-1-Gypsum-Sensor-Moisture/dp/B0002IKRUS
 
 Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
