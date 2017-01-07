@@ -50,10 +50,10 @@
  *    TODO:   done --> RFM95 and MySensor in sleep mode
  *            Flash in sleep mode
  *            done --> Sleep Mode
- *            WDT, issue is complacated due to sleep and MySensor
+ *            WDT, issue is complicated due to sleep and MySensor
  *            done --> Set correct alarms time and functions
  *            Send current time to board
- *            done --> DS18B20 Soil temp sensor
+ *            done?? --> DS18B20 Soil temp sensor -->   Not Tested Yet
  *    
  *    Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
  */
@@ -116,7 +116,7 @@
  **************************************************************************************** */
  //                          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
 const bool MySendTime[24] = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
-#define TXoffset 5            // used to set a TX offset so each node TX's at a difference time
+#define TXoffset 5            // used to set a TX offset so each node TX's at a different time
 
 /* ************************************************************************************** */
 // Most of these items below need to be prior to #include <MySensor.h> 
@@ -189,6 +189,7 @@ int myNodeID =                0;        // Set at run time from jumpers on PCB
 
 #define MY_PARENT_NODE_ID     0         // GW ID
 
+#define CHILD_ID0             0         // Id of my Soil Temp
 #define CHILD_ID1             1         // Id of my Water sensor child
 #define CHILD_ID2             2         // Id of my 2nd sensor child
 #define CHILD_ID3             3         // Id of my 3rd sensor child
@@ -233,10 +234,12 @@ MyMessage IMP4           (CHILD_ID4, V_IMPEDANCE);  // 14 0x0E      // Send Resi
 
 MyMessage VBAT           (CHILD_ID1, V_VOLTAGE);    // 38 0x26      // Send Battery Voltage
 
-MyMessage PressureMsg    (CHILD_ID1,V_PRESSURE);    // 04 0x04      // Send current Water Pressure
-MyMessage TextMsg        (CHILD_ID1,V_TEXT);        // 47 0x2F      // Send status Messages
-MyMessage HumMsg         (CHILD_ID1,V_HUM);         // 01 0x01      // Send current Humidity 
-MyMessage TempMsg        (CHILD_ID1,V_TEMP);        // 00 0x00      // Send current Temperature
+MyMessage PressureMsg    (CHILD_ID0,V_PRESSURE);    // 04 0x04      // Send current Water Pressure
+MyMessage TextMsg        (CHILD_ID0,V_TEXT);        // 47 0x2F      // Send status Messages
+MyMessage HumMsg         (CHILD_ID0,V_HUM);         // 01 0x01      // Send current Humidity 
+MyMessage TempMsg        (CHILD_ID0,V_TEMP);        // 00 0x00      // Send current Air Temperature
+
+MyMessage SoilTempMsg    (CHILD_ID1,V_TEMP);        // 00 0x00      // Send current Soil Temperature 
 
 /* ************************************************************************************** */
 
@@ -260,6 +263,8 @@ void measureSensor();
 void addReading(long resistance);
 long average();
 void printCpuResetCause();
+void systemSleep();
+void systemWakeUp();
 
 /* ************************************************************************************** */
 unsigned long SEND_FREQUENCY        = 15000;      // Minimum time between send (in milliseconds). We don't want to spam the gateway.
@@ -337,7 +342,7 @@ void before()
     #ifndef IDsize2                                      // using only ID0 and ID1
       myNodeID |= (!digitalRead(ID2) << 2);
     #endif
-     myNodeID += NodeID_Base; 
+     myNodeID += NodeID_Base;                             // set our node ID
 
     // Pin for onboard LED
     pinMode(OnBoardLed, OUTPUT);
@@ -505,8 +510,7 @@ void printCpuResetCause()
 }
 
 /* **************** System Sleep ******************* */
-void systemSleep()                                            // <------------- need to break this up...
-                                                              // or move code to check for work
+void systemSleep()
 {
     debug1(PSTR("*** Going to Sleep ***\n"));
     wait (100);
@@ -519,21 +523,17 @@ void systemSleep()                                            // <------------- 
     // Put Flash to sleep
 
     // Put Radio and transport to Sleep
-    transportPowerDown();
+    transportPowerDown();               // is this an issue to do this more than once??? <---
     
     interrupts();                       // make sure interrupts are on...
     LowPower.standby();                 // SAMD sleep
-       //  .... we will wake up from sleeping if triggered after the interrupt
-                                        // if after-wake-up, we need to bring alive the radio ect...
-    
-   
+       //  .... we will wake up from sleeping here if triggered from an interrupt
+    interrupts();                       // make sure interrupts are on...                                      
 }
 
 /* **************** System Wake-up from Sleep ******************* */
-void systemWakeUp()                                            // <------------- need to break this up...
-                                                              // or move code to check for work
-{
-
+void systemWakeUp() 
+{                                          
     interrupts();                       // make sure interrupts are on...
    // re enable LED's if needed
     pinMode (MY_DEFAULT_TX_LED_PIN, OUTPUT);
@@ -543,12 +543,12 @@ void systemWakeUp()                                            // <-------------
 
     // wake up Flash if needed
 
-    // wake up MySensor and Radio from Sleep
+    // wake up MySensor transport and Radio from Sleep
     transportInit();
 }
 
 /* **************** DS3231 Alarm Interrupt ******************* */
-// We do nothing here except reset the interrupt source
+// We do nothing here except reset the interrupt
 #if defined MyDS3231
 void ClockAlarm()
 {
@@ -571,8 +571,10 @@ void ClockAlarm()
 void SendPressure()
 {
 #ifdef WaterPressure
-/* We will read the analog input from the presure transducer 
+/* We will read the analog input from the pressure transducer 
  *  and convert it from an analog voltage to a pressure in PSI
+ *  
+ *  Water pressure transducer requires 5V, may not be avilable in Solar, Battery systems
  * 
  *  Output: 0.5V – 4.5V linear voltage output. 0 psi outputs 0.5V, 50 psi outputs 2.5V, 100 psi outputs 4.5V 
  *  0   psi = .33v after scalling 5.0v to 3.3v
@@ -671,6 +673,9 @@ void getSoilTemp()
     floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
     floatR = floatMSB % 100; 
     debug1(PSTR("Soil Temp DS: %0u.%02uF \n"), floatMSB/100, floatR);
+
+//     send(SoilTempMsg.set(temp, 2), AckFlag);  wait(SendDelay);
+
         
   #endif
 }
