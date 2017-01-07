@@ -5,7 +5,7 @@ This is a work in progress! , but most everything works.
 
 It measures soil moisture from 1 to 4 sensors, has options for soil and air temperature.
 
-Support MCP9800 or Si7021 (humility also) or temp sensor in DS3231 for air temp
+Support MCP9800 or Si7021 (humidity also) or temp sensor in DS3231 for air temp
 
 DS18B20 for soil temp
 
