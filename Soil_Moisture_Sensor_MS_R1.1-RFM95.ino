@@ -44,6 +44,8 @@
  *    DS3231    base I2C address 0x68
  *    EUI64     base I2C address 0x50
  *    
+ *    DS18B20   1Wire address 0x44
+ *    
  *    TODO:   done --> RFM95 and MySensor in sleep mode
  *            Flash in sleep mode
  *            done --> Sleep Mode
@@ -56,18 +58,17 @@
  */
 /* ************************************************************************************** */
 // Define's for the board options
-#define R2A                   // Rev 2a of the board
-#define IDsize2               // using only ID0 and ID1
+#define R2a                     // Rev 2a of the board
+#define IDsize2                 // using only ID0 and ID1
 
 // Select the Temperature and/or Humidity sensor on the board
 //#define Sensor_SI7021         // Using the Si7021 Temp and Humidity sensor
 //#define Sensor_MCP9800        // Using the MCP9800 temp sensor
 //#define WaterPressure         // if we have a water pressure sensor
-
+#define MyDS18B20               // Soil Temp sensor
 //#define MyWDT                 // Watch Dog Timer
-#define MoistureSensor        // Moisture Sensor, 4 channels
-#define MyDS3231              // DS3231 RTC
-
+#define MoistureSensor          // Moisture Sensor, 4 channels
+#define MyDS3231                // DS3231 RTC
 #define MY_SERIALDEVICE Serial  // this will override Serial port define in MyHwSAMD.h file
 
 /* ************************************************************************************** */
@@ -91,6 +92,15 @@
     MCP980X MCP9800(0);
 #endif
 
+#if defined MyDS18B20
+    #include <OneWire.h>
+    #include <DallasTemperature.h>
+    #define ONE_WIRE_BUS_1 18       // This is shared with AIN0 port
+    #define DS1820Baddr     0x44
+    OneWire oneWire_in(ONE_WIRE_BUS_1);
+    DallasTemperature SoilTemp(&oneWire_in);
+#endif
+
 #if defined MyWDT
   #include <avr/wdt.h>              // for watch-dog timer support
 #endif
@@ -104,7 +114,7 @@
  *  NodeID * 5 % 60 is use for the alarm time within the hour, this offset TX time
  **************************************************************************************** */
  //                          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
-const bool MySendTime[24] = {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0};
+const bool MySendTime[24] = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
 #define TXoffset 5
 
 /* ************************************************************************************** */
@@ -118,7 +128,7 @@ const bool MySendTime[24] = {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 //#define MY_DEBUG2           // used in this program, level 2 debug
 
 #define SKETCHNAME      "Soil Moisture Sensor"
-#define SKETCHVERSION   "1.1b"
+#define SKETCHVERSION   "1.1c"
 
 /* ************************************************************************************** */
 /* Enable and select radio type attached, coding rate and frequency
@@ -428,6 +438,11 @@ void setup()
 
 #endif
 
+#if defined MyDS18B20
+  SoilTemp.begin();
+#endif
+
+
 } // end setup()
 
 
@@ -489,7 +504,8 @@ void printCpuResetCause()
 }
 
 /* **************** System Sleep ******************* */
-void systemSleep()
+void systemSleep()                                            // <------------- need to break this up...
+                                                              // or move code to check for work
 {
     debug1(PSTR("*** Going to Sleep ***\n"));
     wait (100);
@@ -508,8 +524,17 @@ void systemSleep()
     LowPower.standby();                 // SAMD sleep
        //  .... we will wake up from sleeping if triggered after the interrupt
                                         // if after-wake-up, we need to bring alive the radio ect...
-    interrupts();                        // make sure interrupts are on...
-    // re enable LED's if needed
+    
+   
+}
+
+/* **************** System Wake-up from Sleep ******************* */
+void systemWakeUp()                                            // <------------- need to break this up...
+                                                              // or move code to check for work
+{
+
+    interrupts();                       // make sure interrupts are on...
+   // re enable LED's if needed
     pinMode (MY_DEFAULT_TX_LED_PIN, OUTPUT);
     pinMode (MY_DEFAULT_RX_LED_PIN, OUTPUT);
     pinMode (MY_DEFAULT_ERR_LED_PIN, OUTPUT);
@@ -635,6 +660,30 @@ void getTempDS3231()
 }
 
 
+/* ***************** Send Soil Temp DS18B20 ***************** */
+void getSoilTemp()
+{
+  #if defined MyDS18B20
+    SoilTemp.requestTemperaturesByAddress(DS18B20addr);   // requestTemperaturesByAddress(0x44)  requestTemperaturesByIndex
+    temp = SoilTemp.getTempFByAddress(DS18B20addr));
+  
+    floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
+    floatR = floatMSB % 100; 
+    debug1(PSTR("Soil Temp DS: %0u.%02uF \n"), floatMSB/100, floatR);
+        
+  #endif
+}
+
+
+//#define ONE_WIRE_BUS_1 18       // This is shared with AIN0 port
+//    #define DS1820Baddr     0x44
+//    OneWire oneWire_in(ONE_WIRE_BUS_1);
+//    DallasTemperature SoilTemp(&oneWire_in);
+
+
+
+
+
 /* ***************** Send Keep Alive ***************** */
 void SendKeepAlive()
 {       
@@ -658,13 +707,15 @@ void loop()
    
     currentTime = millis();                                    
 
- /* ***************** Send  ***************** */
+ /* ***************** Send Sensor Data ***************** */
 #ifndef  MyDS3231
-    if (currentTime - lastSendTime >= SEND_FREQUENCY)          // Only send values at a maximum rate 
+    if (currentTime - lastSendTime >= SEND_FREQUENCY)          // Only send values at a maximum rate (used for debug)
+    {
 #else      
     if (MySendTime[dt.hour] == 1)                              // see if it time to send data
-#endif
     {
+      systemWakeUp();                                          // we have work to do, so wake up radio and transport
+#endif     
       debug1(PSTR("\n*** Sending Sensor Data at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);   
       lastSendTime = currentTime; 
       
@@ -677,13 +728,13 @@ void loop()
       floatR = floatMSB % 100; 
       debug1(PSTR("Vbat: %0u.%02uV \n"), floatMSB/100, floatR);
 
-      SendKeepAlive();  
+      SendKeepAlive(); 
+
+      wait (10000);                                             // Stay awake time
     }
      
-
 #ifdef MyDS3231
-     wait (10000);                                             // Stay awake time
-        systemSleep();
+     systemSleep();                                            // ok, it bedtime, go to sleep
      dt =  clock.getDateTime();                                // get current time from DS3231 
      debug1(PSTR("*** Wakeing From Sleep at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);   
 #endif
