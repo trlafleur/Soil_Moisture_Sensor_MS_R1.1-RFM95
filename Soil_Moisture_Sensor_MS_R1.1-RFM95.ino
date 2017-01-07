@@ -31,7 +31,8 @@
  *  22-Dec-2016 1.0a  TRL - first 
  *  27-Dec-2016 1.1a  TRL - Added DS3232 and Moisture Mux code
  *  31-Dec-2016 1.1a  TRL - Changed freq to 928.5MHz
- *  04-Jan-2017 1.1b  TRL - Adding Sleep and WDT code 
+ *  04-Jan-2017 1.1b  TRL - Adding Sleep and (WDT code ??)
+ *  07-Jan-2017 1.1b  TRL - Adding Soil Temp Sensor
  *
  *  Notes:  1)  Tested with Arduino 1.8.0
  *          2)  Testing using RocketStream M0 with RFM95
@@ -49,10 +50,10 @@
  *    TODO:   done --> RFM95 and MySensor in sleep mode
  *            Flash in sleep mode
  *            done --> Sleep Mode
- *            WDT
- *            done -->  Set correct alarms time and functions
+ *            WDT, issue is complacated due to sleep and MySensor
+ *            done --> Set correct alarms time and functions
  *            Send current time to board
- *            DS18B20 Soil temp sensor
+ *            done --> DS18B20 Soil temp sensor
  *    
  *    Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
  */
@@ -62,19 +63,19 @@
 #define IDsize2                 // using only ID0 and ID1
 
 // Select the Temperature and/or Humidity sensor on the board
-//#define Sensor_SI7021         // Using the Si7021 Temp and Humidity sensor
-//#define Sensor_MCP9800        // Using the MCP9800 temp sensor
+//#define Sensor_SI7021         // if using the Si7021 Temp and Humidity sensor
+//#define Sensor_MCP9800        // if using the MCP9800 temp sensor
 //#define WaterPressure         // if we have a water pressure sensor
-#define MyDS18B20               // Soil Temp sensor
-//#define MyWDT                 // Watch Dog Timer
-#define MoistureSensor          // Moisture Sensor, 4 channels
-#define MyDS3231                // DS3231 RTC
+#define MyDS18B20               // if using a Soil Temp sensor
+//#define MyWDT                 // if using the Watch Dog Timer
+#define MoistureSensor          // if using the Moisture Sensor, 4 channels
+#define MyDS3231                // if using the DS3231 RTC
+
 #define MY_SERIALDEVICE Serial  // this will override Serial port define in MyHwSAMD.h file
 
 /* ************************************************************************************** */
 #include <Arduino.h>
 #include <Wire.h>
-
 
 #if defined MyDS3231
     #include <DS3231.h>
@@ -96,7 +97,7 @@
     #include <OneWire.h>
     #include <DallasTemperature.h>
     #define ONE_WIRE_BUS_1 18       // This is shared with AIN0 port
-    #define DS1820Baddr     0x44
+    #define DS18B20addr     0x44
     OneWire oneWire_in(ONE_WIRE_BUS_1);
     DallasTemperature SoilTemp(&oneWire_in);
 #endif
@@ -110,12 +111,12 @@
 #endif 
 
 /* ************************************************************************************** 
- * A bit array to define the hour to wake up and send sensor messages...
+ * A bit array to define the hour to wake up and send a sensor messages...
  *  NodeID * 5 % 60 is use for the alarm time within the hour, this offset TX time
  **************************************************************************************** */
  //                          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
 const bool MySendTime[24] = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
-#define TXoffset 5
+#define TXoffset 5            // used to set a TX offset so each node TX's at a difference time
 
 /* ************************************************************************************** */
 // Most of these items below need to be prior to #include <MySensor.h> 
@@ -664,8 +665,8 @@ void getTempDS3231()
 void getSoilTemp()
 {
   #if defined MyDS18B20
-    SoilTemp.requestTemperaturesByAddress(DS18B20addr);   // requestTemperaturesByAddress(0x44)  requestTemperaturesByIndex
-    temp = SoilTemp.getTempFByAddress(DS18B20addr));
+    SoilTemp.requestTemperaturesByAddress( (const uint8_t*) DS18B20addr);   // requestTemperaturesByAddress(0x44)  requestTemperaturesByIndex
+    temp = SoilTemp.getTempF( (const uint8_t*) DS18B20addr);
   
     floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
     floatR = floatMSB % 100; 
