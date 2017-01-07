@@ -32,7 +32,7 @@
  *  27-Dec-2016 1.1a  TRL - Added DS3232 and Moisture Mux code
  *  31-Dec-2016 1.1a  TRL - Changed freq to 928.5MHz
  *  04-Jan-2017 1.1b  TRL - Adding Sleep and (WDT code ??)
- *  07-Jan-2017 1.1b  TRL - Adding Soil Temp Sensor
+ *  07-Jan-2017 1.1c  TRL - Adding Soil Temp Sensor
  *
  *  Notes:  1)  Tested with Arduino 1.8.0
  *          2)  Testing using RocketStream M0 with RFM95
@@ -45,7 +45,7 @@
  *    DS3231    base I2C address 0x68
  *    EUI64     base I2C address 0x50
  *    
- *    DS18B20   1Wire address 0x44
+ *    DS18B20   1Wire address 0x44?
  *    
  *    TODO:   done --> RFM95 and MySensor in sleep mode
  *            Flash in sleep mode
