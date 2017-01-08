@@ -445,7 +445,6 @@ void setup()
 
 #if defined MyDS18B20
   SoilTemp.begin();
-  SoilTemp.getDeviceCount();
 #endif
 
 
@@ -655,7 +654,7 @@ void getTempDS3231()
       temp = (temp * 1.8) + 32.0;                                // to get deg F
       floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
       floatR = floatMSB % 100; 
-      debug1(PSTR("Temp DS: %0u.%02uF \n"), floatMSB/100, floatR);
+      debug1(PSTR("Temp: %0u.%02uF \n"), floatMSB/100, floatR);
         
       send(TempMsg.set(temp, 2), AckFlag);  wait(SendDelay);
 
@@ -669,12 +668,14 @@ void getSoilTemp()
   #if defined MyDS18B20
     SoilTemp.requestTemperaturesByIndex( 0);                  // requestTemperaturesByAddress(0x44)  requestTemperaturesByIndex
     temp = SoilTemp.getTempFByIndex( 0);
+    if (temp > 150.0) temp = 150.0;                           // lets do a bounds check...
+    if (temp < -32.0) temp = -32.0;
   
     floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
     floatR = floatMSB % 100; 
-    debug1(PSTR("Soil Temp DS: %0u.%02uF \n"), floatMSB/100, floatR);
+    debug1(PSTR("Soil Temp: %0u.%02uF \n"), floatMSB/100, floatR);
 
-//     send(SoilTempMsg.set(temp, 2), AckFlag);  wait(SendDelay);
+    send(SoilTempMsg.set(temp, 2), AckFlag);  wait(SendDelay);
 
         
   #endif
@@ -807,8 +808,8 @@ void soilsensors()
     send(IMP1.set(read1), AckFlag);  wait(SendDelay);
 
 // Select sensor 2, and enable MUX
-  digitalWrite(MuxA, LOW); 
-  digitalWrite(MuxB, HIGH); 
+  digitalWrite(MuxA, HIGH); 
+  digitalWrite(MuxB, LOW); 
   digitalWrite(MuxINH, LOW); 
   measureSensor();
   read2 = average();
@@ -819,8 +820,8 @@ void soilsensors()
     send(IMP2.set(read2), AckFlag);  wait(SendDelay);
 
     // Select sensor 3, and enable MUX
-  digitalWrite(MuxA, HIGH); 
-  digitalWrite(MuxB, LOW); 
+  digitalWrite(MuxA, LOW); 
+  digitalWrite(MuxB, HIGH); 
   digitalWrite(MuxINH, LOW); 
   measureSensor();
   read3 = average();
