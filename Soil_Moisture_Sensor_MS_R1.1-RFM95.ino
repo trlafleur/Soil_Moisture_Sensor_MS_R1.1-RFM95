@@ -96,10 +96,9 @@
 #if defined MyDS18B20
     #include <OneWire.h>
     #include <DallasTemperature.h>
-    #define ONE_WIRE_BUS_1 18       // This is shared with AIN0 port
-    #define DS18B20addr     0x44
-    OneWire oneWire_in(ONE_WIRE_BUS_1);
-    DallasTemperature SoilTemp(&oneWire_in);
+    #define ONE_WIRE_BUS 18         // This is shared with AIN0 port
+    OneWire oneWire(ONE_WIRE_BUS);
+    DallasTemperature SoilTemp(&oneWire);
 #endif
 
 #if defined MyWDT
@@ -446,6 +445,7 @@ void setup()
 
 #if defined MyDS18B20
   SoilTemp.begin();
+  SoilTemp.getDeviceCount();
 #endif
 
 
@@ -667,8 +667,8 @@ void getTempDS3231()
 void getSoilTemp()
 {
   #if defined MyDS18B20
-    SoilTemp.requestTemperaturesByAddress( (const uint8_t*) DS18B20addr);   // requestTemperaturesByAddress(0x44)  requestTemperaturesByIndex
-    temp = SoilTemp.getTempF( (const uint8_t*) DS18B20addr);
+    SoilTemp.requestTemperaturesByIndex( 0);                  // requestTemperaturesByAddress(0x44)  requestTemperaturesByIndex
+    temp = SoilTemp.getTempFByIndex( 0);
   
     floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
     floatR = floatMSB % 100; 
