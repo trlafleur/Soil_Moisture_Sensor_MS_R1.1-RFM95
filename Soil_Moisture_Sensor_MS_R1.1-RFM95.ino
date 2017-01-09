@@ -53,7 +53,7 @@
  *            WDT, issue is complicated due to sleep and MySensor
  *            done --> Set correct alarms time and functions
  *            Send current time to board
- *            done?? --> DS18B20 Soil temp sensor -->   Not Tested Yet
+ *            done --> DS18B20 Soil temp sensor
  *    
  *    Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
  */
