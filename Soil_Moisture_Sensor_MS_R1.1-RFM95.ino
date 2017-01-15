@@ -60,7 +60,7 @@
 /* ************************************************************************************** */
 // Define's for the board options
 #define R2a                     // Rev 2a of the board
-#define IDsize2                 // using only ID0 and ID1
+#define IDsize2                 // using only ID0 and ID1, ID2, D6 is needed for LoRa on TTN with RFM95
 
 // Select the Temperature and/or Humidity sensor on the board
 //#define Sensor_SI7021         // if using the Si7021 Temp and Humidity sensor
@@ -69,8 +69,8 @@
 #define MyDS18B20               // if using a Soil Temp sensor
 //#define MyWDT                 // if using the Watch Dog Timer
 #define MoistureSensor          // if using the Moisture Sensor, 4 channels
-//#define MyDS3231                // if using the DS3231 RTC
-
+#define MyDS3231                // if using the DS3231 RTC
+//#define SendHeartbeat
 #define MY_SERIALDEVICE Serial  // this will override Serial port define in MyHwSAMD.h file
 
 /* ************************************************************************************** */
@@ -114,7 +114,7 @@
  *  NodeID * 5 % 60 is use for the alarm time within the hour, this offset TX time
  **************************************************************************************** */
  //                          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
-const bool MySendTime[24] = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
+const bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 #define TXoffset 5            // used to set a TX offset so each node TX's at a different time
 
 /* ************************************************************************************** */
@@ -295,7 +295,7 @@ static float humi, temp;                          // used by Si7021, MCP9800, DS
 
 typedef struct {                  // Structure to be used in percentage and resistance values matrix to be filtered (have to be in pairs)
   int moisture;
-  int resistance;
+  unsigned long resistance;
 } values;
 
 // Setting up format for reading 4 soil sensors
@@ -310,7 +310,7 @@ int zeroCalibration = 138;        // calibrate sensor resistace to zero when inp
 
 values valueOf[NUM_READS];        // Calculated  resistances to be averaged
 long buffer[NUM_READS];
-int index2;
+int index2 = 0;
 int i;                            // Simple index variable
 int j=0;                          // Simple index variable
 
@@ -387,7 +387,7 @@ void setup()
   // set up ATD and reference, for ATD to use:
   // analogReference(AR_EXTERNAL);
   // options --> AR_DEFAULT, AR_INTERNAL, AR_EXTERNAL, AR_INTERNAL1V0, AR_INTERNAL1V65, AR_INTERNAL2V23
-      analogReference(AR_INTERNAL);
+      analogReference(AR_DEFAULT);              // AR_DEFAULT is set to VDD = +3.3v, AR_EXTERNAL is set to external pin on chip
       analogReadResolution(12);
 
 #if defined Sensor_SI7021
@@ -432,11 +432,12 @@ void setup()
   // Set our alarms...
   // Set Alarm1 - At  10 second pass the minute
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
-  clock.setAlarm1(0, 0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_S);
+  // clock.setAlarm1(0, 0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_S);
 
   // Set Alarm2 - At "myNodeID" minute past the hour                   // this allow for pseudo-random TX time
   // setAlarm2(Date or Day, Hour, Minute, Mode, Armed = true)
-  clock.setAlarm2(0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_M);       // using NodeID to offset wake time and TX
+     clock.setAlarm2(0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_M);       // using NodeID to offset wake time and TX
+  // clock.setAlarm2(0, 0, myNodeID, DS3231_MATCH_M);       // using NodeID to offset wake time
 
   // Attach Interrput.  DS3231 INT is connected to Pin 38
   attachInterrupt(DS3231Int, ClockAlarm, LOW);                         // please note that RISING and FALLING do NOT work on current Zero code base in sleep 
@@ -685,15 +686,17 @@ void getSoilTemp()
 /* ***************** Send Keep Alive ***************** */
 void SendKeepAlive()
 {       
+#ifdef SendHeartbeat         
           sendHeartbeat();  wait(SendDelay);
-
+          debug1(PSTR("*** Sending Heart Beat ***\n\n"));
+#endif
           SendPressure();                                               // send water pressure to GW if we have it
           getTempSi7021();                                              // send Temp and Humitty to GW if we have it
           getTempMCP9800();                                             // send Temp to GW if we have it
           getTempDS3231();                                              // send Temp to GW if we have it
           getSoilTemp();                                                // send Soil Temp if we have it
           keepaliveTime = currentTime;                                  // reset timer
-          debug1(PSTR("*** Sending Heart Beat ***\n\n"));
+         
 }
 
 
@@ -866,18 +869,19 @@ void measureSensor()
       {
         pinMode(SensDX, OUTPUT);              // this will be used as current source
         pinMode(SensDY, INPUT);               // we will read from this channel 
-        digitalWrite(SensDX, LOW);            // clear any stray current  
+        digitalWrite(SensDX, LOW);            // clear any stray current
+        wait (10);  
         digitalWrite(SensDX, HIGH);           // set it high to supply current to sensor 
         delayMicroseconds(250);
         sensorVoltage = analogRead(SensAY);   // read the sensor voltage
         supplyVoltage = analogRead(SensAX);   // read the supply voltage
                
-        digitalWrite(SensDX, LOW);            // clear any stray current  
+        digitalWrite(SensDX, LOW);            // clear any stray current
+        wait (10);   
         pinMode(SensDX, INPUT);               // HiZ the input channel
         pinMode(SensDY, INPUT);               // HiZ the input channel
         resistance = (knownResistor * (supplyVoltage - sensorVoltage ) / sensorVoltage) - zeroCalibration ;
         if (resistance <= 0) resistance = 0;            // do some reasonable bounds checking
-        if (resistance >= 100000) resistance = 100000;  // 100k max
              
         addReading(resistance);               // save it
         delayMicroseconds(250);
@@ -885,19 +889,20 @@ void measureSensor()
     // Invert the current and do it again...
         pinMode(SensDY, OUTPUT);              // this will be used as current source
         pinMode(SensDX, INPUT);               // we will read from this channel  
-        digitalWrite(SensDY, LOW);            // clear any stray current    
+        digitalWrite(SensDY, LOW);            // clear any stray current
+        wait (10);    
         digitalWrite(SensDY, HIGH);           // set it high to supply current to sensor  
         delayMicroseconds(250);
         sensorVoltage = analogRead(SensAX);   // read the sensor voltage
         supplyVoltage = analogRead(SensAY);   // read the supply voltage
         
-        digitalWrite(SensDY, LOW);            // clear any stray current 
+        digitalWrite(SensDY, LOW);            // clear any stray current
+        wait (10); 
         pinMode(SensDY, INPUT);               // HiZ the input channel
         pinMode(SensDX, INPUT);               // HiZ the input channel
         
         resistance = (knownResistor * (supplyVoltage - sensorVoltage ) / sensorVoltage) - zeroCalibration ;
         if (resistance <= 0) resistance = 0;            // do some reasonable bounds checking
-        if (resistance >= 100000) resistance = 100000;  // 100k max
         
        addReading(resistance);                // save it
        wait(100);
