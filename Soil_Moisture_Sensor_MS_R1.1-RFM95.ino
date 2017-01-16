@@ -855,9 +855,10 @@ void soilsensors()
 /* ******************************************************** */ 
 int GetMoisture(unsigned long read)
 {
-    int moisture = min( int( pow( read / 31.65 , 1.0 / -1.695 ) * 400 + 0.5 ) , 100 );
-    if (moisture <= 0) moisture = 0;
-    if (moisture > 100) moisture = 100;
+    // this equation changes based on calibration of sensors
+    int moisture = min( int( pow( read / 31.65 , 1.0 / -1.695 ) * 400 + 0.5 ) , 100 ); 
+    if (moisture < 0)   moisture = 0;
+  //  if (moisture > 100) moisture = 100;
   return moisture;
 }
 
