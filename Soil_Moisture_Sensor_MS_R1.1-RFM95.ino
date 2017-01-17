@@ -69,7 +69,7 @@
 #define MyDS18B20               // if using a Soil Temp sensor
 //#define MyWDT                 // if using the Watch Dog Timer
 #define MoistureSensor          // if using the Moisture Sensor, 4 channels
-#define MyDS3231                // if using the DS3231 RTC
+//#define MyDS3231                // if using the DS3231 RTC
 //#define SendHeartbeat
 #define MY_SERIALDEVICE Serial  // this will override Serial port define in MyHwSAMD.h file
 
@@ -673,8 +673,9 @@ void getSoilTemp()
     if (temp < -32.0) temp = -32.0;
   
     floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
+    if (floatMSB < 0) floatMSB = 0.0;                          // we can't deal with negative numbers
     floatR = floatMSB % 100; 
-    debug1(PSTR("Soil Temp: %0u.%02uF \n"), floatMSB/100, floatR);
+    debug1(PSTR("Soil Temp: %0u.%02u F \n"), floatMSB/100, floatR);
 
     send(SoilTempMsg.set(temp, 2), AckFlag);  wait(SendDelay);
 
@@ -739,6 +740,7 @@ void loop()
      
 #ifdef MyDS3231
      systemSleep();                                            // ok, it bedtime, go to sleep
+         // Ok, its wake up time....
      dt =  clock.getDateTime();                                // get current time from DS3231 
      debug1(PSTR("*** Wakeing From Sleep at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);   
 #endif
@@ -852,6 +854,7 @@ void soilsensors()
   return;
 }
 
+
 /* ******************************************************** */ 
 int GetMoisture(unsigned long read)
 {
@@ -882,7 +885,7 @@ void measureSensor()
         pinMode(SensDX, INPUT);               // HiZ the input channel
         pinMode(SensDY, INPUT);               // HiZ the input channel
         resistance = (knownResistor * (supplyVoltage - sensorVoltage ) / sensorVoltage) - zeroCalibration ;
-        if (resistance <= 0) resistance = 0;            // do some reasonable bounds checking
+        if (resistance < 0) resistance = 0;   // do some reasonable bounds checking
              
         addReading(resistance);               // save it
         delayMicroseconds(250);
@@ -903,7 +906,7 @@ void measureSensor()
         pinMode(SensDX, INPUT);               // HiZ the input channel
         
         resistance = (knownResistor * (supplyVoltage - sensorVoltage ) / sensorVoltage) - zeroCalibration ;
-        if (resistance <= 0) resistance = 0;            // do some reasonable bounds checking
+        if (resistance < 0) resistance = 0;   // do some reasonable bounds checking
         
        addReading(resistance);                // save it
        wait(100);
