@@ -566,7 +566,7 @@ void systemWakeUp()
     // wake up MySensor transport and Radio from Sleep
     hwSleep(1);                         // as MySensor had NO sleep or Watch Dog for SAMD, this will
                                         // wake us up so that we can send and receive messages
-    while (!isTransportReady()) {       // Make sure tarasport is ready
+    while (!isTransportReady()) {       // Make sure transport is ready
     _process(); }
 
     interrupts();                       // make sure interrupts are on...
