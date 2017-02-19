@@ -114,6 +114,7 @@
  * A bit array to define the hour to wake up and send a sensor messages...
  *  NodeID * 5 % 60 is use for the alarm time within the hour, this offset TX time
  **************************************************************************************** */
+ // we always take a sensor reading at MySendTime[0] --> or midnight
  //                          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
 const bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 #define TXoffset 5            // used to set a TX offset so each node TX's at a different time
@@ -740,7 +741,7 @@ void loop()
      
 #else
             
-    if (MySendTime[dt.hour] == 1)                              // See if it time to send data
+    if ((MySendTime[dt.hour] == 1)  || (dt.hour == 0))       // See if it time to send data, we always send at midnight
     {
       systemWakeUp();                                          // we have work to do, so wake up radio and transport
       debug1(PSTR("\n*** Sending Sensor Data at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second); 
