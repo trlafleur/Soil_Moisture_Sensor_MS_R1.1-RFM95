@@ -33,11 +33,12 @@
  *  31-Dec-2016 1.1a  TRL - Changed freq to 928.5MHz
  *  04-Jan-2017 1.1b  TRL - Adding Sleep and (WDT code ??)
  *  07-Jan-2017 1.1c  TRL - Adding Soil Temp Sensor
+ *  14-feb-2017 1.1d  TRL - Adding time of day request
  *
  *  Notes:  1)  Tested with Arduino 1.8.0
- *          2)  Testing using RocketStream M0 with RFM95
+ *          2)  Testing using RocketStream M0 with RFM95 & RFM95T
  *          3)  Sensor 2 board, Rev2a 
- *          4)  MySensor 2.1 30 Dec 2016
+ *          4)  MySensor 2.1.1 30 Dec 2016
  *    
  *    
  *    MCP9800   base I2C address 0x40
@@ -52,7 +53,7 @@
  *            done --> Sleep Mode
  *            WDT, issue is complicated due to sleep and MySensor
  *            done --> Set correct alarms time and functions
- *            Send current time to board
+ *            done --> Send current time to board
  *            done --> DS18B20 Soil temp sensor
  *    
  *    Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
@@ -69,8 +70,8 @@
 #define MyDS18B20               // if using a Soil Temp sensor
 //#define MyWDT                 // if using the Watch Dog Timer
 #define MoistureSensor          // if using the Moisture Sensor, 4 channels
-//#define MyDS3231                // if using the DS3231 RTC
-//#define SendHeartbeat
+#define MyDS3231                // if using the DS3231 RTC
+//#define SendHeartbeat           // if sending the heartbeat message
 #define MY_SERIALDEVICE Serial  // this will override Serial port define in MyHwSAMD.h file
 
 /* ************************************************************************************** */
@@ -125,10 +126,10 @@ const bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 //#define MY_SPECIAL_DEBUG
 //#define MY_DEBUG_VERBOSE_RFM95 
 #define MY_DEBUG1           // used in this program, level 1 debug
-//#define MY_DEBUG2           // used in this program, level 2 debug
+#define MY_DEBUG2           // used in this program, level 2 debug
 
 #define SKETCHNAME      "Soil Moisture Sensor"
-#define SKETCHVERSION   "1.1c"
+#define SKETCHVERSION   "1.1d"
 
 /* ************************************************************************************** */
 /* Enable and select radio type attached, coding rate and frequency
@@ -145,12 +146,13 @@ const bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 
 #define MY_RADIO_RFM95
 #define MY_RFM95_MODEM_CONFIGRUATION    RFM95_BW125CR45SF128
-#define MY_RFM95_TX_POWER               13 // max is 23
+#define MY_RFM95_TX_POWER               23 // max is 23
+//#define MY_RF95_TCXO                    // If using an RFM95 with a TCXO
 //#define MY_RFM95_ATC_MODE_DISABLED
 #define MY_RFM95_ATC_TARGET_RSSI        (-60)
 #define MY_RFM95_FREQUENCY              (928.5f)
 
-#define SendDelay                       0
+#define SendDelay                       250
 #define AckFlag                         false
 
 /* ************************************************************************************** */
@@ -188,7 +190,7 @@ int myNodeID =                0;        // Set at run time from jumpers on PCB
 
 #define MY_PARENT_NODE_ID     0         // GW ID
 
-#define CHILD_ID0             0         // Id of my Soil Temp
+#define CHILD_ID0             0         // Id of my Sensor
 #define CHILD_ID1             1         // Id of my Water sensor child
 #define CHILD_ID2             2         // Id of my 2nd sensor child
 #define CHILD_ID3             3         // Id of my 3rd sensor child
@@ -231,7 +233,7 @@ MyMessage IMP2           (CHILD_ID2, V_IMPEDANCE);  // 14 0x0E      // Send Resi
 MyMessage IMP3           (CHILD_ID3, V_IMPEDANCE);  // 14 0x0E      // Send Resistance Ch 3
 MyMessage IMP4           (CHILD_ID4, V_IMPEDANCE);  // 14 0x0E      // Send Resistance Ch 4
 
-MyMessage VBAT           (CHILD_ID1, V_VOLTAGE);    // 38 0x26      // Send Battery Voltage
+MyMessage VBAT           (CHILD_ID0, V_VOLTAGE);    // 38 0x26      // Send Battery Voltage
 
 MyMessage PressureMsg    (CHILD_ID0,V_PRESSURE);    // 04 0x04      // Send current Water Pressure
 MyMessage TextMsg        (CHILD_ID0,V_TEXT);        // 47 0x2F      // Send status Messages
@@ -247,6 +249,7 @@ MyMessage SoilTempMsg    (CHILD_ID1,V_TEMP);        // 00 0x00      // Send curr
   RTCDateTime dt;
   boolean isAlarm = false;
   boolean alarmState = false;
+  boolean alarmUpdateFlag = true;         // Its time to request an update if true
 #endif
 
 /* *************************** Forward Declaration ************************************* */
@@ -255,6 +258,7 @@ void SendKeepAlive();
 void getTempSi7021();
 void getTempMCP9800 ();
 void receive(const MyMessage &message);
+void receiveTime(unsigned long ts);
 void hexdump(unsigned char *buffer, unsigned long index, unsigned long width);
 int  GetMoisture(unsigned long read);
 void soilsensors();
@@ -272,7 +276,9 @@ unsigned long KEEPALIVE_FREQUENCY   = 120000;     // Send Keep Alive message at 
 unsigned long currentTime         = 0;
 unsigned long lastSendTime        = 0;
 unsigned long keepaliveTime       = 0;
-          
+
+#define StayAwakeTime 1000                        // Stay Awake time before sleeping
+      
 int pressure      = 0;                            // Current value from ATD
 float PSI         = 0;                            // Current PSI
 float PSI_CAL     = 2.0;                          // Calibration of sensor
@@ -289,9 +295,9 @@ static float humi, temp;                          // used by Si7021, MCP9800, DS
 #define SensDX  17
 #define SensAY  A0  
 #define SensAX  A2  
-#define MuxA    8
-#define MuxB    7
-#define MuxINH  9
+#define MuxA     8
+#define MuxB     7
+#define MuxINH   9
 
 typedef struct {                  // Structure to be used in percentage and resistance values matrix to be filtered (have to be in pairs)
   int moisture;
@@ -329,7 +335,7 @@ unsigned long read4 = 0;
  // Before is part of MySensor core 
 void before() 
 { 
-     debug1(PSTR("***In before***\n"));
+     debug1(PSTR("*** In before ***\n"));
  
  // need to set up pins prior to reading them...
      pinMode(ID0, INPUT_PULLUP);
@@ -347,7 +353,7 @@ void before()
     pinMode(OnBoardLed, OUTPUT);
     digitalWrite(OnBoardLed, LOW);
 
-     // No longer need these pins, so remove pullups to save power
+     // We no longer need these pins, so remove pullups to save power
      pinMode(ID0, INPUT);
      pinMode(ID1, INPUT);
      pinMode(ID2, INPUT);
@@ -361,9 +367,8 @@ void setup()
 {  
  //   wdt_enable(WDTO_8S);                // lets set WDT in case we have a problem...
       
-    send(TextMsg.set("Starting"), AckFlag);  wait(SendDelay);   
-    debug1(PSTR("***In Setup***\n"));
-    //debug1(PSTR(" ** Hello from the Water Sensor on a M0 **\n") );
+    //send(TextMsg.set("Starting"), AckFlag);  wait(SendDelay);   <--------------------------------------
+    debug1(PSTR("*** In Setup ***\n"));
   
     // de-select on board Flash 
     pinMode(OnBoardFlash, OUTPUT);
@@ -382,13 +387,13 @@ void setup()
   debug1(PSTR(" %s \n\n"), compile_date);
   debug1(PSTR(" My Node ID: %u\n\n"), myNodeID);
 
-  printCpuResetCause();
+  //printCpuResetCause();                   // this will tell us what causes CPU reset  <-----------------------
   
   // set up ATD and reference, for ATD to use:
-  // analogReference(AR_EXTERNAL);
   // options --> AR_DEFAULT, AR_INTERNAL, AR_EXTERNAL, AR_INTERNAL1V0, AR_INTERNAL1V65, AR_INTERNAL2V23
-      analogReference(AR_DEFAULT);              // AR_DEFAULT is set to VDD = +3.3v, AR_EXTERNAL is set to external pin on chip
-      analogReadResolution(12);
+  
+      analogReference(AR_DEFAULT);              // AR_DEFAULT is set to VDD -> +3.3v, AR_EXTERNAL is set to external pin on chip
+      analogReadResolution(12);                 // we want 12 bits
 
 #if defined Sensor_SI7021
     si7021.initialize();
@@ -426,18 +431,25 @@ void setup()
   clock.clearAlarm2();
 
   // Set sketch compiling time to the DS3231
-  debug1(PSTR("Setting Time on DS3231 \n"));
+  debug1(PSTR("*** Setting Time on DS3231 \n"));
   clock.setDateTime(__DATE__, __TIME__);
 
-  // Set our alarms...
-  // Set Alarm1 - At  10 second pass the minute
+/* ************** Set our alarms... **************** */
+
+/* Alarm 1 is set to wake us up once a week to request time updated for RTC 
+   It will set a flag, but wait until its time to send a normal sensor message */
+  // Set Alarm1 - At  (myNodeID*TXoffset%60) second pass the minute    // for testing
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
   // clock.setAlarm1(0, 0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_S);
 
-  // Set Alarm2 - At "myNodeID" minute past the hour                   // this allow for pseudo-random TX time
+  // Set Alarm1 - 3h:00m:00s on every Sunday (1 - Mon, 7 - Sun)         // Set to request time-update for RTC each week
+  // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
+  clock.setAlarm1(7, 3, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_DY_H_M_S);
+  
+/* Alarm 2 is set to wake us up every hour to see if it time to make a sensor reading */
+  // Set Alarm2 - At "myNodeID" minute past the hour                   // this allow for pseudo-random TX time each hour
   // setAlarm2(Date or Day, Hour, Minute, Mode, Armed = true)
-     clock.setAlarm2(0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_M);       // using NodeID to offset wake time and TX
-  // clock.setAlarm2(0, 0, myNodeID, DS3231_MATCH_M);       // using NodeID to offset wake time
+  clock.setAlarm2(0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_M);       // using NodeID to offset wake time and TX
 
   // Attach Interrput.  DS3231 INT is connected to Pin 38
   attachInterrupt(DS3231Int, ClockAlarm, LOW);                         // please note that RISING and FALLING do NOT work on current Zero code base in sleep 
@@ -448,6 +460,9 @@ void setup()
   SoilTemp.begin();
 #endif
 
+  // Request time from controler on startup
+    requestTime();
+    wait(5000);
 
 } // end setup()
 
@@ -457,7 +472,7 @@ void setup()
 /* **************************************************************************** */
 void presentation()  
 {
- // Send the sketch version information to the gateway and Controller
+  // Send the sketch version information to the gateway and Controller
   sendSketchInfo(SKETCHNAME, SKETCHVERSION, AckFlag);   wait(SendDelay);
  
   // Register this device as Water Moisture Sensor
@@ -467,7 +482,7 @@ void presentation()
 
 /* **************************************************************************** 
  * 
- * Prints the cause of the last reset
+ * Send and print the cause of the last reset
  * It uses the PM->RCAUSE register to detect the cause of the last reset.
  *
  * **************************************************************************** */
@@ -504,9 +519,8 @@ void printCpuResetCause()
     char txtBuffer[30];
     debug1((" [ %u ]\n"), PM->RCAUSE.reg);
     sprintf(txtBuffer,"CPU Reset: [ %u ]\n", PM->RCAUSE.reg);
-    //debug1(txtBuffer);
-    send(TextMsg.set(txtBuffer), AckFlag);  wait(SendDelay); 
-    
+
+    send(TextMsg.set(txtBuffer), AckFlag);  wait(SendDelay);        // sending reset info to controler  
 }
 
 /* **************** System Sleep ******************* */
@@ -520,13 +534,16 @@ void systemSleep()
     pinMode (MY_DEFAULT_RX_LED_PIN, INPUT);
     pinMode (MY_DEFAULT_ERR_LED_PIN, INPUT);
     pinMode (OnBoardLed, INPUT); 
+    
     // Put Flash to sleep
+    
 
     // Put Radio and transport to Sleep
     transportPowerDown();               // is this an issue to do this more than once??? <---
     
     interrupts();                       // make sure interrupts are on...
-    LowPower.standby();                 // SAMD sleep
+    LowPower.standby();                 // SAMD sleep from LowPower systems
+    
        //  .... we will wake up from sleeping here if triggered from an interrupt
     interrupts();                       // make sure interrupts are on...                                      
 }
@@ -534,40 +551,46 @@ void systemSleep()
 /* **************** System Wake-up from Sleep ******************* */
 void systemWakeUp() 
 {                                          
-    interrupts();                       // make sure interrupts are on...
-   // re enable LED's if needed
-    pinMode (MY_DEFAULT_TX_LED_PIN, OUTPUT);
-    pinMode (MY_DEFAULT_RX_LED_PIN, OUTPUT);
-    pinMode (MY_DEFAULT_ERR_LED_PIN, OUTPUT);
-    pinMode (OnBoardLed, OUTPUT);  
+    
+//  re enable LED's if needed
+//    pinMode (MY_DEFAULT_TX_LED_PIN, OUTPUT);
+//    pinMode (MY_DEFAULT_RX_LED_PIN, OUTPUT);
+//    pinMode (MY_DEFAULT_ERR_LED_PIN, OUTPUT);
+//    pinMode (OnBoardLed, OUTPUT);  
 
     // wake up Flash if needed
 
     // wake up MySensor transport and Radio from Sleep
-    transportInit();
+    hwSleep(1);                         // as MySensor had NO sleep or Watch Dog for SAMD, this will
+                                        // wake us up so thate we can send and receive messages
+    while (!isTransportReady()) {
+    _process(); }
+
+    interrupts();                       // make sure interrupts are on...
 }
 
 /* **************** DS3231 Alarm Interrupt ******************* */
-// We do nothing here except reset the interrupt
+// We do nothing here except to reset the interrupt
 #if defined MyDS3231
 void ClockAlarm()
 {
-  if (clock.isAlarm1(false))              // is set to true, will also clear the alarm..
+  if (clock.isAlarm1(false))              // if set to true, will also clear the alarm..
   {
     clock.clearAlarm1();
-    //debug1(PSTR("*** Alarm 1 ***\n"));
+    alarmUpdateFlag = true;               // request time of day flag
+    debug1(PSTR("*** Alarm 1 ***\n"));
   }
 
   if (clock.isAlarm2(false))
   {
     clock.clearAlarm2();
-    //debug1(PSTR("*** Alarm 2 ***\n"));
+    debug1(PSTR("*** Alarm 2 ***\n"));
   }
 }
 #endif
 
 
-/* ***************** Send Pressure ***************** */
+/* ***************** Send Water Pressure ***************** */
 void SendPressure()
 {
 #ifdef WaterPressure
@@ -678,13 +701,12 @@ void getSoilTemp()
     debug1(PSTR("Soil Temp: %0u.%02u F \n"), floatMSB/100, floatR);
 
     send(SoilTempMsg.set(temp, 2), AckFlag);  wait(SendDelay);
-
-        
+     
   #endif
 }
 
 
-/* ***************** Send Keep Alive ***************** */
+/* ***************** Send Keep Alive status ***************** */
 void SendKeepAlive()
 {       
 #ifdef SendHeartbeat         
@@ -696,8 +718,7 @@ void SendKeepAlive()
           getTempMCP9800();                                             // send Temp to GW if we have it
           getTempDS3231();                                              // send Temp to GW if we have it
           getSoilTemp();                                                // send Soil Temp if we have it
-          keepaliveTime = currentTime;                                  // reset timer
-         
+          keepaliveTime = currentTime;                                  // reset timer 
 }
 
 
@@ -712,30 +733,40 @@ void loop()
 
  /* ***************** Send Sensor Data ***************** */
 #ifndef  MyDS3231
+
     if (currentTime - lastSendTime >= SEND_FREQUENCY)          // Only send values at a maximum rate (used for debug)
     {
-#else      
-    if (MySendTime[dt.hour] == 1)                              // see if it time to send data
+      debug1(PSTR("\n*** Sending Sensor Data\n")); 
+     
+#else
+            
+    if (MySendTime[dt.hour] == 1)                              // See if it time to send data
     {
       systemWakeUp();                                          // we have work to do, so wake up radio and transport
-     
       debug1(PSTR("\n*** Sending Sensor Data at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second); 
+
+        if ( alarmUpdateFlag == true)                           // if its time, request time update from controler
+        {
+          debug1(PSTR("\n*** Requesting Time\n")); 
+          alarmUpdateFlag = false;
+          requestTime();                                       // Ask controler for time of day
+        }
 #endif
-        
+
       lastSendTime = currentTime; 
       
       soilsensors(); 
       int vbat = analogRead(BattVolt);
       float Vsys =  vbat * 0.000805861 * 1.97;                  // read the battery voltage, 12bits = 0 -> 4095, divider is 1/2
       send(VBAT.set(Vsys, 2), AckFlag);  wait(SendDelay);
-      sendBatteryLevel(vbat/41);  wait (SendDelay);             // Sent MySensor battery in %, count / 41 = 4095/41 = 99%
+      sendBatteryLevel(vbat/41);  wait (SendDelay);             // Send MySensor battery in %, count / 41 = 4095/41 = 99%
       floatMSB = Vsys * 100;                                    // we donot have floating point printing in debug print
       floatR = floatMSB % 100; 
       debug1(PSTR("Vbat: %0u.%02uV \n"), floatMSB/100, floatR);
 
       SendKeepAlive(); 
-
-      wait (10000);                                             // Stay awake time
+      
+      wait (StayAwakeTime);                                     // Stay awake time
     }
      
 #ifdef MyDS3231
@@ -755,31 +786,31 @@ void loop()
  * ******************************************************* */
 void receive(const MyMessage &message) 
 {
-   //debug2(PSTR("Received message from gw:\n"));
+   debug2(PSTR("*** Received message from gw:\n"));
    //debug2(PSTR("Last: %u, Sender: %u, Dest: %u, Type: %u, Sensor: %u\n"), message.last, message.sender, message.destination, message.type, message.sensor);
    
 // Make sure its for our child ID
-  if (message.sensor == CHILD_ID1 )
+  if (message.sensor == CHILD_ID0 )
   {
-    if  (message.type==V_VAR1)                                                   // Update Pulse Count to new value
+    if  (message.type==V_VAR1)                                                   // 24 Set sending times
       {
-        debug2(PSTR("Received last pulse count from gw: %u\n"), pulseCount);
+       debug2(PSTR("*** Received V_Var1 message gw\n") );
       }
     
-     if ( message.type==V_VAR2)                                                  // ??
+     if ( message.type==V_VAR2)                                                  // 25
       {
-        debug2(PSTR("Received V_VAR2 message from gw: %u\n"), pulseCount );
+      debug2(PSTR("*** Received V_VAR2 message from gw\n") );
       }
     
-     if ( message.type==V_VAR3)                                                   // send all values now
+     if ( message.type==V_VAR3)                                                   // 26
       {
-        SendKeepAlive();        
-        debug2(PSTR("Received V_VAR3 message from gw"));
+      
+        debug2(PSTR("*** Received V_VAR3 message from gw"));
       }
 
-     if ( message.type==V_VAR4)                                                   // Calabrate offset for PSI
+     if ( message.type==V_VAR4)                                                   // 27
       {
-        debug2(PSTR("Received V_VAR4 message from gw: %u\n"), PSI_CAL);
+        debug2(PSTR("*** Received V_VAR4 message from gw\n") );
       }
 
     }  // end if (message.sensor == CHILD_ID1 )
@@ -788,8 +819,19 @@ void receive(const MyMessage &message)
  // Check for any messages for child ID = 2
   if (message.sensor == CHILD_ID2 )
     {
-      debug2(PSTR("Received Child ID-2 message from gw. \n"));
+      debug2(PSTR("*** Received Child ID-1 message from gw. \n"));
     }
+}
+
+void receiveTime(unsigned long ts)
+{
+  debug1(PSTR("*** Received Time from gw: %u \n"), ts);
+
+#ifdef MyDS3231
+  // Set from UNIX timestamp
+    clock.setDateTime(ts); 
+    dt =  clock.getDateTime(); 
+#endif
 }
 
 
