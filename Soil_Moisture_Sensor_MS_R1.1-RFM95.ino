@@ -564,7 +564,8 @@ void systemWakeUp()
     // wake up Flash if needed
 
     // wake up MySensor transport and Radio from Sleep
-    hwSleep(1);                         // as MySensor had NO sleep or Watch Dog for SAMD, this will
+    //transportInit();
+    //hwSleep(1);                         // as MySensor had NO sleep or Watch Dog for SAMD, this will
                                         // wake us up so that we can send and receive messages
     while (!isTransportReady()) {       // Make sure transport is ready
     _process(); }
@@ -763,7 +764,7 @@ void loop()
       
       soilsensors(); 
       int vbat = analogRead(BattVolt);                        // we will do it twice, junk the 1st read
-      int vbat = analogRead(BattVolt);
+      vbat = analogRead(BattVolt);
       float Vsys =  vbat * 0.000805664 * 1.97;                // read the battery voltage, 12bits = 0 -> 4095, divider is 1/2
       send(VBAT.set(Vsys, 2), AckFlag);  wait(SendDelay);
       sendBatteryLevel(vbat/41);  wait (SendDelay);           // Send MySensor battery in %, count / 41 = 4095/41 = 99%
