@@ -529,7 +529,7 @@ void printCpuResetCause()
 /* **************** System Sleep ******************* */
 void systemSleep()
 {
-    debug1(PSTR("*** Going to Sleep ***\n\n"));
+    debug1(PSTR("\n*** Going to Sleep ***\n"));
     wait (100);
     // put led's, radio and flash to sleep
     // Turn off LED's
@@ -780,7 +780,7 @@ void loop()
      systemSleep();                                            // ok, it bedtime, go to sleep
          // Ok, its wake up time....
      dt =  clock.getDateTime();                                // get current time from DS3231 
-     debug1(PSTR("*** Wakeing From Sleep at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);   
+     debug1(PSTR("\n*** Wakeing From Sleep at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);   
 #endif
                        
 }   // end of loop 
