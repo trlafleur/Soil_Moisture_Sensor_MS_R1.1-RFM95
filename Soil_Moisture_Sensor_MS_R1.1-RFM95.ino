@@ -111,16 +111,16 @@
   #include <math.h>                 // Conversion equation from resistance to %
 #endif 
 
-/* ************************************************************************************** 
+/* *********************************************************************************************** 
  * A bit array to define the hour to wake up and send a sensor messages...
- *  NodeID * 5 % 60 is use for the alarm time within the hour, this offset TX time
- **************************************************************************************** */
+ *  (NodeID * 5 %) 60 is use for the alarm time within the hour, this offset TX time for each node
+ ************************************************************************************************ */
  // we always take a sensor reading at MySendTime[0] --> or midnight
  //                    0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
 bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 #define TXoffset 5            // used to set a TX offset so each node TX's at a different time
 
-/* ************************************************************************************** */
+/* ********************************************************************************************** */
 // Most of these items below need to be prior to #include <MySensor.h> 
 
 /*  Enable debug prints to serial monitor on port 0 */
@@ -160,8 +160,6 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 /* ************************************************************************************** */
 // Select correct defaults for the processor and board we are using
 #ifdef __SAMD21G18A__                 // useing an ARM M0 Processsor, Zero, Feather M0, RocketScream Mini Pro
-//#ifdef defined(ARDUINO_ARCH_SAMD)
-//#warning Requires an ARM M0 SAMD21G18A Processsor
 
 //#define MY_RFM95_RST_PIN        0
 #define MY_RFM95_IRQ_PIN          2               // IRQ
@@ -171,7 +169,8 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 #define MY_DEFAULT_RX_LED_PIN     11
 #define OnBoardLed                13              // CPU Led
 #define MY_WITH_LEDS_BLINKING_INVERSE
-#define OnBoardFlash               4              // Flash chip on processor
+#define MY_OTA_FLASH_SS            4              // Flash chip on processor
+#define MY_OTA_FLASH_JDECID       0x1F65          // Rocket M0?? 0x0101??
 
 #define ID0                        0              // ID pin
 #define ID1                        1
@@ -253,7 +252,7 @@ MyMessage SoilTempMsg    (CHILD_ID1,V_TEMP);        // 00 0x00      // Send curr
   RTCDateTime dt;
   boolean isAlarm = false;
   boolean alarmState = false;
-  boolean alarmUpdateFlag = true;         // Its time to request an update if true
+  boolean alarmUpdateFlag = true;         // Its time to request an update for RTC if true
 #endif
 
 /* *************************** Forward Declaration ************************************* */
@@ -281,7 +280,7 @@ unsigned long currentTime         = 0;
 unsigned long lastSendTime        = 0;
 unsigned long keepaliveTime       = 0;
 
-#define StayAwakeTime 1000                        // Stay Awake time before sleeping
+#define StayAwakeTime 5000                        // Stay Awake time before sleeping
       
 int pressure      = 0;                            // Current value from ATD
 float PSI         = 0;                            // Current PSI
@@ -334,7 +333,7 @@ unsigned long read4 = 0;
 
  
 /* **************************************************************************** */
-/* ************************** Before ****************************************** */
+/*                                Before                                        */
 /* **************************************************************************** */
  // Before is part of MySensor core 
 void before() 
@@ -365,18 +364,18 @@ void before()
 
 
 /* **************************************************************************** */
-/* ************************** Setup ******************************************* */
+/*                            Setup                                             */
 /* **************************************************************************** */
 void setup()  
 {  
  //   wdt_enable(WDTO_8S);                // lets set WDT in case we have a problem...
       
-    //send(TextMsg.set("Starting"), AckFlag);  wait(SendDelay);   <--------------------------------------
+    //send(TextMsg.set("Starting"), AckFlag);  wait(SendDelay);
     debug1(PSTR("*** In Setup ***\n"));
   
     // de-select on board Flash 
-    pinMode(OnBoardFlash, OUTPUT);
-    digitalWrite(OnBoardFlash, HIGH);
+    pinMode(MY_OTA_FLASH_SS, OUTPUT);
+    digitalWrite(MY_OTA_FLASH_SS, HIGH);
 
     // Pin for DS3231 alarm interrupt
     pinMode(38, INPUT_PULLUP);
@@ -391,7 +390,7 @@ void setup()
   debug1(PSTR(" %s \n\n"), compile_date);
   debug1(PSTR(" My Node ID: %u\n\n"), myNodeID);
 
-  //printCpuResetCause();                   // this will tell us what causes CPU reset  <-----------------------
+  printCpuResetCause();                   // this will tell us what causes CPU reset  
   
   // set up ATD and reference, for ATD to use:
   // options --> AR_DEFAULT, AR_INTERNAL, AR_EXTERNAL, AR_INTERNAL1V0, AR_INTERNAL1V65, AR_INTERNAL2V23
@@ -438,7 +437,7 @@ void setup()
   debug1(PSTR("*** Setting Time on DS3231 \n"));
   clock.setDateTime(__DATE__, __TIME__);
 
-/* ************** Set our alarms... **************** */
+/* ************** This sets our alarms... **************** */
 
 /* Alarm 1 is set to wake us up once a week to request time updated for RTC 
    It will set a flag, but wait until its time to send a normal sensor message to request time */
@@ -486,7 +485,7 @@ void presentation()
 
 /* **************************************************************************** 
  * 
- * Send and print the cause of the last reset
+ * Sends and print the cause of the last reset
  * It uses the PM->RCAUSE register to detect the cause of the last reset.
  *
  * **************************************************************************** */
@@ -530,7 +529,7 @@ void printCpuResetCause()
 /* **************** System Sleep ******************* */
 void systemSleep()
 {
-    debug1(PSTR("*** Going to Sleep ***\n"));
+    debug1(PSTR("*** Going to Sleep ***\n\n"));
     wait (100);
     // put led's, radio and flash to sleep
     // Turn off LED's
@@ -543,7 +542,7 @@ void systemSleep()
     
 
     // Put Radio and transport to Sleep
-    transportPowerDown();               // is this an issue to do this more than once??? <---
+    transportPowerDown();               // Shut down radio and MySensor transport
     
     interrupts();                       // make sure interrupts are on...
     LowPower.standby();                 // SAMD sleep from LowPower systems
@@ -566,8 +565,8 @@ void systemWakeUp()
 
     // wake up MySensor transport and Radio from Sleep
     hwSleep(1);                         // as MySensor had NO sleep or Watch Dog for SAMD, this will
-                                        // wake us up so thate we can send and receive messages
-    while (!isTransportReady()) {
+                                        // wake us up so that we can send and receive messages
+    while (!isTransportReady()) {       // Make sure tarasport is ready
     _process(); }
 
     interrupts();                       // make sure interrupts are on...
@@ -727,7 +726,7 @@ void SendKeepAlive()
 
 
 /* **************************************************************************** */
-/* **************************** Loop ****************************************** */
+/*                               Loop                                           */
 /* **************************************************************************** */
 void loop()     
 { 
@@ -736,7 +735,7 @@ void loop()
     currentTime = millis();                                    
 
  /* ***************** Send Sensor Data ***************** */
-#ifndef  MyDS3231
+#ifndef  MyDS3231   // this is used for debug only, it allows us to send data at a faster rate
 
     if (currentTime - lastSendTime >= SEND_FREQUENCY)          // Only send values at a maximum rate (used for debug)
     {
@@ -744,12 +743,12 @@ void loop()
      
 #else
             
-    if ((MySendTime[dt.hour] == 1)  || (dt.hour == 0))       // See if it time to send data, we always send at midnight
+    if ((MySendTime[dt.hour] == 1)  || (dt.hour == 0))         // See if it time to send data, we always send at midnight
     {
       systemWakeUp();                                          // we have work to do, so wake up radio and transport
       debug1(PSTR("\n*** Sending Sensor Data at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second); 
 
-        if ( alarmUpdateFlag == true)                           // if its time, request time update from controler
+        if (alarmUpdateFlag == true)                           // if its time, request time update from controler
         {
           debug1(PSTR("\n*** Requesting Time\n")); 
           alarmUpdateFlag = false;
@@ -759,21 +758,22 @@ void loop()
 
       lastSendTime = currentTime;
        
-      // Request a Schedule update at this time...
+      // Request a TX Schedule update at this time...
       send(ScheduleUpdate.set(1,0), AckFlag);  wait(SendDelay);
       
       soilsensors(); 
+      int vbat = analogRead(BattVolt);                        // we will do it twice, junk the 1st read
       int vbat = analogRead(BattVolt);
-      float Vsys =  vbat * 0.000805861 * 1.97;                  // read the battery voltage, 12bits = 0 -> 4095, divider is 1/2
+      float Vsys =  vbat * 0.000805664 * 1.97;                // read the battery voltage, 12bits = 0 -> 4095, divider is 1/2
       send(VBAT.set(Vsys, 2), AckFlag);  wait(SendDelay);
-      sendBatteryLevel(vbat/41);  wait (SendDelay);             // Send MySensor battery in %, count / 41 = 4095/41 = 99%
-      floatMSB = Vsys * 100;                                    // we donot have floating point printing in debug print
+      sendBatteryLevel(vbat/41);  wait (SendDelay);           // Send MySensor battery in %, count / 41 = 4095/41 = 99%
+      floatMSB = Vsys * 100;                                  // we donot have floating point printing in debug print
       floatR = floatMSB % 100; 
       debug1(PSTR("Vbat: %0u.%02uV \n"), floatMSB/100, floatR);
 
       SendKeepAlive(); 
       
-      wait (StayAwakeTime);                                     // Stay awake time
+      wait (StayAwakeTime);                                    // Stay awake time
     }
      
 #ifdef MyDS3231
@@ -786,11 +786,11 @@ void loop()
 }   // end of loop 
 
 
-/****************** Message Receive Loop *******************
+/****************** Message Receive Loop ***************************
  * 
  * This is the message receive loop, here we look for messages address to us 
  * 
- * ******************************************************* */
+ * ***************************************************************** */
 void receive(const MyMessage &message) 
 {
    debug2(PSTR("*** Received message from gw:\n"));
@@ -828,8 +828,8 @@ void receive(const MyMessage &message)
     }  // end if (message.sensor == CHILD_ID1 )
 
 
- // Check for any messages for child ID = 2
-  if (message.sensor == CHILD_ID2 )
+ // Check for any messages for child ID = 1
+  if (message.sensor == CHILD_ID1 )
     {
       debug2(PSTR("*** Received Child ID-1 message from gw. \n"));
     }
@@ -841,8 +841,8 @@ void receiveTime(unsigned long ts)
 
 #ifdef MyDS3231
   // Set from UNIX timestamp
-    clock.setDateTime(ts); 
-    dt =  clock.getDateTime(); 
+    clock.setDateTime(ts);                              // Set time in DS3231
+    dt =  clock.getDateTime();                          // Set time in system clock
 #endif
 }
 
