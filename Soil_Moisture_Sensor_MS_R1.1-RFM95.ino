@@ -55,6 +55,7 @@
  *            done --> Set correct alarms time and functions
  *            done --> Send current time to board
  *            done --> DS18B20 Soil temp sensor
+ *            done --> schedule update from controler
  *    
  *    Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
  */
@@ -103,7 +104,7 @@
 #endif
 
 #if defined MyWDT
-  #include <avr/wdt.h>              // for watch-dog timer support
+  // #include <avr/wdt.h>              // for watch-dog timer support
 #endif
 
 #if defined MoistureSensor
@@ -115,8 +116,8 @@
  *  NodeID * 5 % 60 is use for the alarm time within the hour, this offset TX time
  **************************************************************************************** */
  // we always take a sensor reading at MySendTime[0] --> or midnight
- //                          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
-const bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+ //                    0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 #define TXoffset 5            // used to set a TX offset so each node TX's at a different time
 
 /* ************************************************************************************** */
@@ -240,8 +241,10 @@ MyMessage PressureMsg    (CHILD_ID0,V_PRESSURE);    // 04 0x04      // Send curr
 MyMessage TextMsg        (CHILD_ID0,V_TEXT);        // 47 0x2F      // Send status Messages
 MyMessage HumMsg         (CHILD_ID0,V_HUM);         // 01 0x01      // Send current Humidity 
 MyMessage TempMsg        (CHILD_ID0,V_TEMP);        // 00 0x00      // Send current Air Temperature
+MyMessage ScheduleUpdate (CHILD_ID0,V_VAR1);        // 24 0x18      // Request a schedule update from controler
 
-MyMessage SoilTempMsg    (CHILD_ID1,V_TEMP);        // 00 0x00      // Send current Soil Temperature 
+MyMessage SoilTempMsg    (CHILD_ID1,V_TEMP);        // 00 0x00      // Send current Soil Temperature
+ 
 
 /* ************************************************************************************** */
 
@@ -438,14 +441,14 @@ void setup()
 /* ************** Set our alarms... **************** */
 
 /* Alarm 1 is set to wake us up once a week to request time updated for RTC 
-   It will set a flag, but wait until its time to send a normal sensor message */
-  // Set Alarm1 - At  (myNodeID*TXoffset%60) second pass the minute    // for testing
+   It will set a flag, but wait until its time to send a normal sensor message to request time */
+  // Set Alarm1 - At  (myNodeID*TXoffset%60) second pass the minute    // <--- for testing
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
   // clock.setAlarm1(0, 0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_S);
 
   // Set Alarm1 - 3h:00m:00s on every Sunday (1 - Mon, 7 - Sun)         // Set to request time-update for RTC each week
   // setAlarm1(Date or Day, Hour, Minute, Second, Mode, Armed = true)
-  clock.setAlarm1(7, 3, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_DY_H_M_S);
+  clock.setAlarm1(7, 3, 0, 0, DS3231_MATCH_DY_H_M_S);
   
 /* Alarm 2 is set to wake us up every hour to see if it time to make a sensor reading */
   // Set Alarm2 - At "myNodeID" minute past the hour                   // this allow for pseudo-random TX time each hour
@@ -659,7 +662,7 @@ void  getTempMCP9800 ()
 //    temp = MCP9800.readTempC16(AMBIENT) / 16.0;               // In deg C
       temp = MCP9800.readTempF10(AMBIENT) / 10.0;               // In deg F
       
-      floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
+      floatMSB = temp * 100;                                    // we donot have floating point printing in debug print
       floatR = floatMSB % 100; 
       debug1(PSTR("Temp MCP: %0u.%02uF \n"), floatMSB/100, floatR);
       
@@ -670,14 +673,14 @@ void  getTempMCP9800 ()
 /* ***************** Send DS3231 Temp ***************** */
 void getTempDS3231()
 {
-   #if defined  Sensor_MCP9800 || defined Sensor_SI7021       // we will used other Temp sensor if avilable
+   #if defined  Sensor_MCP9800 || defined Sensor_SI7021        // we will used other Temp sensor if avilable
         // nothing here
    #elif defined MyDS3231
-      clock.forceConversion();                                  // Start conversion of Temp sensor
+      clock.forceConversion();                                 // Start conversion of Temp sensor
       wait(25);
       temp = clock.readTemperature();
-      temp = (temp * 1.8) + 32.0;                                // to get deg F
-      floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
+      temp = (temp * 1.8) + 32.0;                              // to get deg F
+      floatMSB = temp * 100;                                   // we donot have floating point printing in debug print
       floatR = floatMSB % 100; 
       debug1(PSTR("Temp: %0u.%02uF \n"), floatMSB/100, floatR);
         
@@ -754,7 +757,10 @@ void loop()
         }
 #endif
 
-      lastSendTime = currentTime; 
+      lastSendTime = currentTime;
+       
+      // Request a Schedule update at this time...
+      send(ScheduleUpdate.set(1,0), AckFlag);  wait(SendDelay);
       
       soilsensors(); 
       int vbat = analogRead(BattVolt);
@@ -793,23 +799,28 @@ void receive(const MyMessage &message)
 // Make sure its for our child ID
   if (message.sensor == CHILD_ID0 )
   {
-    if  (message.type==V_VAR1)                                                   // 24 Set sending times
+    if  (message.type==V_VAR1)                                        // (24) This will received a new schedule time to send sensor data
       {
-       debug2(PSTR("*** Received V_Var1 message gw\n") );
+       unsigned long newSchedule = message.getULong();
+       debug2(PSTR("*** Received V_Var1 message gw: 0x%x\n"), newSchedule );
+       for (i=0; i< 23; i++) 
+        {  
+          MySendTime[i] = ((newSchedule >> i) & 0x00000001);
+        }          
       }
     
-     if ( message.type==V_VAR2)                                                  // 25
+     if ( message.type==V_VAR2)                                       // (25)
       {
       debug2(PSTR("*** Received V_VAR2 message from gw\n") );
       }
     
-     if ( message.type==V_VAR3)                                                   // 26
+     if ( message.type==V_VAR3)                                       // (26)
       {
       
         debug2(PSTR("*** Received V_VAR3 message from gw"));
       }
 
-     if ( message.type==V_VAR4)                                                   // 27
+     if ( message.type==V_VAR4)                                       // (27)
       {
         debug2(PSTR("*** Received V_VAR4 message from gw\n") );
       }
