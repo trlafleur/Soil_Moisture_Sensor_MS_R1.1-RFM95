@@ -760,7 +760,9 @@ void loop()
       lastSendTime = currentTime;
        
       // Request a TX Schedule update at this time...
+      debug1(PSTR("\n*** Requesting Schedule Update\n")); 
       send(ScheduleUpdate.set(1,0), AckFlag);  wait(SendDelay);
+      wait (10000);
       
       soilsensors(); 
       int vbat = analogRead(BattVolt);                        // we will do it twice, junk the 1st read
