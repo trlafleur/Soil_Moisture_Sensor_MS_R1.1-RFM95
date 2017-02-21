@@ -9,6 +9,7 @@ IDE 1.81
 SAMD 1.6.11
 RocketScream M0 with RFM95 radio
 ~~~
+Data from the sensor to MQTT-gateway to MQTT to (Telegraf to InFluxdb to Grafana) Controller function via NODE.RED connected via MQTT.
 
 It measures soil moisture from 1 to 4 sensors, has options for soil and air temperature.
 
