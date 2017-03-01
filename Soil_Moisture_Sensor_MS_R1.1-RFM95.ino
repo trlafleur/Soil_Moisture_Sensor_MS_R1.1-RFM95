@@ -159,7 +159,7 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 
 /* ************************************************************************************** */
 // Select correct defaults for the processor and board we are using
-#ifdef __SAMD21G18A__                 // useing an ARM M0 Processsor, Zero, Feather M0, RocketScream Mini Pro
+#ifdef __SAMD21G18A__                 // Using an ARM M0 Processor, Zero, Feather M0, RocketScream Mini Pro
 
 //#define MY_RFM95_RST_PIN        0
 #define MY_RFM95_IRQ_PIN          2               // IRQ
@@ -220,7 +220,7 @@ int myNodeID =                0;        // Set at run time from jumpers on PCB
 
 /* ************************************************************************************** */
 #define PressPin      A4                            // Pressure sensor is on analog input, 0 to 100psi
-#define BattVolt      A5                            // Battery Voltage on pin A5.  270k/270k divder = 1/2,  6.6v max
+#define BattVolt      A5                            // Battery Voltage on pin A5.  270k/270k divider = 1/2,  6.6v max
 
 /* ************************************************************************************** */
 
@@ -240,7 +240,7 @@ MyMessage PressureMsg    (CHILD_ID0,V_PRESSURE);    // 04 0x04      // Send curr
 MyMessage TextMsg        (CHILD_ID0,V_TEXT);        // 47 0x2F      // Send status Messages
 MyMessage HumMsg         (CHILD_ID0,V_HUM);         // 01 0x01      // Send current Humidity 
 MyMessage TempMsg        (CHILD_ID0,V_TEMP);        // 00 0x00      // Send current Air Temperature
-MyMessage ScheduleUpdate (CHILD_ID0,V_VAR1);        // 24 0x18      // Request a schedule update from controler
+MyMessage ScheduleUpdate (CHILD_ID0,V_VAR1);        // 24 0x18      // Request a schedule update from controller
 
 MyMessage SoilTempMsg    (CHILD_ID1,V_TEMP);        // 00 0x00      // Send current Soil Temperature
  
@@ -310,11 +310,11 @@ typedef struct {                  // Structure to be used in percentage and resi
 // Setting up format for reading 4 soil sensors
 #define NUM_READS 12              // Number of sensor reads for filtering
 
-const long knownResistor = 4700;  // Value of reference resistors in Ohms, = reference for sensor
+const long knownResistor = 4700;  // Value of reference resistors in ohms, = reference for sensor
 
 unsigned long supplyVoltage;      // Measured supply voltage
 unsigned long sensorVoltage;      // Measured sensor voltage
-int zeroCalibration = 138;        // calibrate sensor resistace to zero when input is short circuited
+int zeroCalibration = 138;        // calibrate sensor resistance to zero when input is short circuited
                                   // basically this is compensating for the mux switch resistance
 
 values valueOf[NUM_READS];        // Calculated  resistances to be averaged
@@ -437,7 +437,7 @@ void setup()
   debug1(PSTR("*** Setting Time on DS3231 \n"));
   clock.setDateTime(__DATE__, __TIME__);
 
-/* ************** This sets our alarms... **************** */
+/* ************** This sets our Alarms... **************** */
 
 /* Alarm 1 is set to wake us up once a week to request time updated for RTC 
    It will set a flag, but wait until its time to send a normal sensor message to request time */
@@ -463,7 +463,7 @@ void setup()
   SoilTemp.begin();
 #endif
 
-  // Request time from controler on startup
+  // Request time from controller on startup
     requestTime();
     wait(5000);
 
@@ -491,7 +491,7 @@ void presentation()
  * **************************************************************************** */
 void printCpuResetCause()
 {
-    debug1(PSTR("***CPU reset by"));
+    debug1(PSTR("*** CPU reset by"));
 
     if (PM->RCAUSE.bit.SYST) {
         debug1(PSTR(" Software"));
@@ -523,7 +523,7 @@ void printCpuResetCause()
     debug1((" [ %u ]\n"), PM->RCAUSE.reg);
     sprintf(txtBuffer,"CPU Reset: [ %u ]\n", PM->RCAUSE.reg);
 
-    send(TextMsg.set(txtBuffer), AckFlag);  wait(SendDelay);        // sending reset info to controler  
+    send(TextMsg.set(txtBuffer), AckFlag);  wait(SendDelay);        // sending reset info to controller
 }
 
 /* **************** System Sleep ******************* */
@@ -565,7 +565,7 @@ void systemWakeUp()
 
     // wake up MySensor transport and Radio from Sleep
     //transportInit();
-    //hwSleep(1);                         // as MySensor had NO sleep or Watch Dog for SAMD, this will
+    hwSleep(1);                         // as MySensor had NO sleep or Watch Dog for SAMD, this will
                                         // wake us up so that we can send and receive messages
     while (!isTransportReady()) {       // Make sure transport is ready
     _process(); }
@@ -601,10 +601,10 @@ void SendPressure()
 /* We will read the analog input from the pressure transducer 
  *  and convert it from an analog voltage to a pressure in PSI
  *  
- *  Water pressure transducer requires 5V, may not be avilable in Solar, Battery systems
+ *  Water pressure transducer requires 5V, may not be available in Solar, Battery systems
  * 
  *  Output: 0.5V – 4.5V linear voltage output. 0 psi outputs 0.5V, 50 psi outputs 2.5V, 100 psi outputs 4.5V 
- *  0   psi = .33v after scalling 5.0v to 3.3v
+ *  0   psi = .33v after scaling 5.0v to 3.3v
  *  50  psi = 1.65v
  *  100 psi = 2.97v
  *
@@ -639,13 +639,13 @@ void getTempSi7021()
       
       temp = (temp * 1.8) + 32.0;                                // to get deg F
 
-      floatMSB = humi * 100;                                     // we donot have floating point printing in debug print
+      floatMSB = humi * 100;                                     // we don't have floating point printing in debug print
       floatR = floatMSB % 100; 
       debug1(PSTR("Humi: %0u.%02u%% \n"), floatMSB/100, floatR);
       
       send(HumMsg.set(humi, 2), AckFlag);  wait(SendDelay);
 
-      floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
+      floatMSB = temp * 100;                                     // we don't have floating point printing in debug print
       floatR = floatMSB % 100; 
       debug1(PSTR("Temp Si: %0u.%02uF \n"), floatMSB/100, floatR);
       
@@ -673,14 +673,14 @@ void  getTempMCP9800 ()
 /* ***************** Send DS3231 Temp ***************** */
 void getTempDS3231()
 {
-   #if defined  Sensor_MCP9800 || defined Sensor_SI7021        // we will used other Temp sensor if avilable
+   #if defined  Sensor_MCP9800 || defined Sensor_SI7021        // we will used other Temp sensor if available
         // nothing here
    #elif defined MyDS3231
       clock.forceConversion();                                 // Start conversion of Temp sensor
       wait(25);
       temp = clock.readTemperature();
       temp = (temp * 1.8) + 32.0;                              // to get deg F
-      floatMSB = temp * 100;                                   // we donot have floating point printing in debug print
+      floatMSB = temp * 100;                                   // we don't have floating point printing in debug print
       floatR = floatMSB % 100; 
       debug1(PSTR("Temp: %0u.%02uF \n"), floatMSB/100, floatR);
         
@@ -699,7 +699,7 @@ void getSoilTemp()
     if (temp > 150.0) temp = 150.0;                           // lets do a bounds check...
     if (temp < -32.0) temp = -32.0;
   
-    floatMSB = temp * 100;                                     // we donot have floating point printing in debug print
+    floatMSB = temp * 100;                                     // we don't have floating point printing in debug print
     if (floatMSB < 0) floatMSB = 0.0;                          // we can't deal with negative numbers
     floatR = floatMSB % 100; 
     debug1(PSTR("Soil Temp: %0u.%02u F \n"), floatMSB/100, floatR);
@@ -749,11 +749,11 @@ void loop()
       systemWakeUp();                                          // we have work to do, so wake up radio and transport
       debug1(PSTR("\n*** Sending Sensor Data at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second); 
 
-        if (alarmUpdateFlag == true)                           // if its time, request time update from controler
+        if (alarmUpdateFlag == true)                           // if its time, request time update from controller
         {
           debug1(PSTR("\n*** Requesting Time\n")); 
           alarmUpdateFlag = false;
-          requestTime();                                       // Ask controler for time of day
+          requestTime();                                       // Ask controller for time of day
         }
 #endif
 
@@ -762,7 +762,7 @@ void loop()
       // Request a TX Schedule update at this time...
       debug1(PSTR("\n*** Requesting Schedule Update\n")); 
       send(ScheduleUpdate.set(1,0), AckFlag);  wait(SendDelay);
-      wait (10000);
+      wait (2000);
       
       soilsensors(); 
       int vbat = analogRead(BattVolt);                        // we will do it twice, junk the 1st read
@@ -770,7 +770,7 @@ void loop()
       float Vsys =  vbat * 0.000805664 * 1.97;                // read the battery voltage, 12bits = 0 -> 4095, divider is 1/2
       send(VBAT.set(Vsys, 2), AckFlag);  wait(SendDelay);
       sendBatteryLevel(vbat/41);  wait (SendDelay);           // Send MySensor battery in %, count / 41 = 4095/41 = 99%
-      floatMSB = Vsys * 100;                                  // we donot have floating point printing in debug print
+      floatMSB = Vsys * 100;                                  // we don't have floating point printing in debug print
       floatR = floatMSB % 100; 
       debug1(PSTR("Vbat: %0u.%02uV \n"), floatMSB/100, floatR);
 
