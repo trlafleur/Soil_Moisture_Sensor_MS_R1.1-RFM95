@@ -10,10 +10,10 @@
  *  
  *  Water from a pressure transducer, 0 to 5v
  *    Input from sensor is scaled by .6577, 5.0v * .6577 = 3.288v
- *    (10.2k and a 19.6k resistor, flitered with a .1uf cap)
+ *    (10.2k and a 19.6k resistor, filtered with a .1uf cap)
  *   
  *  Output: 0.5V – 4.5V linear voltage output. 0 psi outputs 0.5V, 50 psi outputs 2.5V, 100 psi outputs 4.5V 
- *    0   psi = 0.33v after scalling 5.0v to 3.3v
+ *    0   psi = 0.33v after scaling 5.0v to 3.3v
  *    50  psi = 1.65v
  *    100 psi = 2.97v
  *    3.3v/1023 = .003225806 volt per bit or 3.3V/4095 = .000805861 volts per bit
@@ -55,14 +55,15 @@
  *            done --> Set correct alarms time and functions
  *            done --> Send current time to board
  *            done --> DS18B20 Soil temp sensor
- *            done --> schedule update from controler
+ *            done --> schedule update from controller
  *    
  *    Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
  */
 /* ************************************************************************************** */
+
 // Define's for the board options
 #define R2a                     // Rev 2a of the board
-#define IDsize2                 // using only ID0 and ID1, ID2, D6 is needed for LoRa on TTN with RFM95
+#define IDsize2                 // if using only ID0 and ID1, ID2, D6 is needed for LoRa on TTN with RFM95
 
 // Select the Temperature and/or Humidity sensor on the board
 //#define Sensor_SI7021         // if using the Si7021 Temp and Humidity sensor
@@ -454,7 +455,7 @@ void setup()
   // setAlarm2(Date or Day, Hour, Minute, Mode, Armed = true)
   clock.setAlarm2(0, 0, (myNodeID*TXoffset)%60, DS3231_MATCH_M);       // using NodeID to offset wake time and TX
 
-  // Attach Interrput.  DS3231 INT is connected to Pin 38
+  // Attach Interrupt.  DS3231 INT is connected to Pin 38
   attachInterrupt(DS3231Int, ClockAlarm, LOW);                         // please note that RISING and FALLING do NOT work on current Zero code base in sleep 
 
 #endif
@@ -662,7 +663,7 @@ void  getTempMCP9800 ()
 //    temp = MCP9800.readTempC16(AMBIENT) / 16.0;               // In deg C
       temp = MCP9800.readTempF10(AMBIENT) / 10.0;               // In deg F
       
-      floatMSB = temp * 100;                                    // we donot have floating point printing in debug print
+      floatMSB = temp * 100;                                    // we don't have floating point printing in debug print
       floatR = floatMSB % 100; 
       debug1(PSTR("Temp MCP: %0u.%02uF \n"), floatMSB/100, floatR);
       
@@ -718,7 +719,7 @@ void SendKeepAlive()
           debug1(PSTR("*** Sending Heart Beat ***\n\n"));
 #endif
           SendPressure();                                               // send water pressure to GW if we have it
-          getTempSi7021();                                              // send Temp and Humitty to GW if we have it
+          getTempSi7021();                                              // send Temp and Humidity to GW if we have it
           getTempMCP9800();                                             // send Temp to GW if we have it
           getTempDS3231();                                              // send Temp to GW if we have it
           getSoilTemp();                                                // send Soil Temp if we have it
