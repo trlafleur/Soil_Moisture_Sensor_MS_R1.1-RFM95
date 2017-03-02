@@ -21,7 +21,7 @@
  *
  *    Max6816 is used as an option on Rev2a board to de-bounce the flow reed switch on the meter
  *    The switch must be stable for 40ms to get an output, this limits the max
- *    rate this device can support to less than 20Hz or so.
+ *    rate this device can support to less than 20Hz or so. (1,200 gpm)
  *
  *
  * CHANGE LOG:
@@ -34,8 +34,9 @@
  *  04-Jan-2017 1.1b  TRL - Adding Sleep and (WDT code ??)
  *  07-Jan-2017 1.1c  TRL - Adding Soil Temp Sensor
  *  14-feb-2017 1.1d  TRL - Adding time of day request
+ *  02-Mar-2017 1.1e  TRL - Added KeepAwake code and message
  *
- *  Notes:  1)  Tested with Arduino 1.8.0
+ *  Notes:  1)  Tested with Arduino 1.8.1
  *          2)  Testing using RocketStream M0 with RFM95 & RFM95T
  *          3)  Sensor 2 board, Rev2a 
  *          4)  MySensor 2.1.1 30 Dec 2016
@@ -56,6 +57,7 @@
  *            done --> Send current time to board
  *            done --> DS18B20 Soil temp sensor
  *            done --> schedule update from controller
+ *            done --> added KeepAwake code and message
  *    
  *    Based on the work of: Reinier van der Lee, www.vanderleevineyard.com
  */
@@ -282,6 +284,9 @@ unsigned long lastSendTime        = 0;
 unsigned long keepaliveTime       = 0;
 
 #define StayAwakeTime 5000                        // Stay Awake time before sleeping
+
+bool KeepAwakeFlag = false;
+#define KeepAliveID      0x5aa5
       
 int pressure      = 0;                            // Current value from ATD
 float PSI         = 0;                            // Current PSI
@@ -745,8 +750,9 @@ void loop()
      
 #else
             
-    if ((MySendTime[dt.hour] == 1)  || (dt.hour == 0))         // See if it time to send data, we always send at midnight
+    if ((MySendTime[dt.hour] == 1)  || (dt.hour == 12))         // See if it time to send data, we always send at noon
     {
+      if (dt.hour == 12) KeepAwakeFlag = false;                // we only want to keep awake till noon
       systemWakeUp();                                          // we have work to do, so wake up radio and transport
       debug1(PSTR("\n*** Sending Sensor Data at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second); 
 
@@ -781,13 +787,17 @@ void loop()
     }
      
 #ifdef MyDS3231
-     systemSleep();                                            // ok, it bedtime, go to sleep
+     if ( KeepAwakeFlag == false)                              // see if keep alive flag is not set
+     {
+      systemSleep();                                           // ok, it bedtime, go to sleep
          // Ok, its wake up time....
-     dt =  clock.getDateTime();                                // get current time from DS3231 
-     debug1(PSTR("\n*** Wakeing From Sleep at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);   
+      dt =  clock.getDateTime();                               // get current time from DS3231 
+      debug1(PSTR("\n*** Wakeing From Sleep at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);
+     }   
 #endif
                        
 }   // end of loop 
+
 
 
 /****************** Message Receive Loop ***************************
@@ -813,9 +823,11 @@ void receive(const MyMessage &message)
         }          
       }
     
-     if ( message.type==V_VAR2)                                       // (25)
+     if ( message.type==V_VAR2)                                       // (25) This will received a "do not sleep flag", that keep us awake until noon each day
       {
-      debug2(PSTR("*** Received V_VAR2 message from gw\n") );
+        unsigned int flag = message.getUInt();
+        if (flag == KeepAliveID) KeepAwakeFlag = true;          
+        debug2(PSTR("*** Received V_VAR2 message from gw: 0x%x\n"), flag );
       }
     
      if ( message.type==V_VAR3)                                       // (26)
