@@ -134,7 +134,7 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 #define MY_DEBUG2           // used in this program, level 2 debug
 
 #define SKETCHNAME      "Soil Moisture Sensor"
-#define SKETCHVERSION   "1.1d"
+#define SKETCHVERSION   "1.1e"
 
 /* ************************************************************************************** */
 /* Enable and select radio type attached, coding rate and frequency
