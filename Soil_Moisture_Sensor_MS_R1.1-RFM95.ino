@@ -65,12 +65,13 @@
 
 // Define's for the board options
 #define R2a                     // Rev 2a of the board
-#define IDsize2                 // if using only ID0 and ID1, ID2, D6 is needed for LoRa on TTN with RFM95
+//#define IDsize2                 // if using only ID0 and ID1. ID2 --> D6 is needed for LoRaWan code base on TTN with RFM95
 
 // Select the Temperature and/or Humidity sensor on the board
 //#define Sensor_SI7021         // if using the Si7021 Temp and Humidity sensor
 //#define Sensor_MCP9800        // if using the MCP9800 temp sensor
 //#define WaterPressure         // if we have a water pressure sensor
+//#define WaterMeter            // if we have a water flow meter
 #define MyDS18B20               // if using a Soil Temp sensor
 //#define MyWDT                 // if using the Watch Dog Timer
 #define MoistureSensor          // if using the Moisture Sensor, 4 channels
@@ -157,12 +158,12 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 #define MY_RFM95_ATC_TARGET_RSSI        (-60)
 #define MY_RFM95_FREQUENCY              (928.5f)
 
-#define SendDelay                       250
-#define AckFlag                         false
+#define SendDelay                       250       // this is the delay after each send
+#define AckFlag                         false     // if we are requesting an ACK from GW
 
 /* ************************************************************************************** */
 // Select correct defaults for the processor and board we are using
-#ifdef __SAMD21G18A__                 // Using an ARM M0 Processor, Zero, Feather M0, RocketScream Mini Pro
+#ifdef __SAMD21G18A__                             // Using an ARM M0 Processor, Zero, Feather M0, RocketScream Mini Pro
 
 //#define MY_RFM95_RST_PIN        0
 #define MY_RFM95_IRQ_PIN          2               // IRQ
@@ -326,7 +327,7 @@ int zeroCalibration = 138;        // calibrate sensor resistance to zero when in
 values valueOf[NUM_READS];        // Calculated  resistances to be averaged
 long buffer[NUM_READS];
 int index2 = 0;
-int i;                            // Simple index variable
+int i=0;                            // Simple index variable
 int j=0;                          // Simple index variable
 
 long resistance = 0;
@@ -356,7 +357,7 @@ void before()
     #ifndef IDsize2                                      // using only ID0 and ID1
       myNodeID |= (!digitalRead(ID2) << 2);
     #endif
-     myNodeID += NodeID_Base;                             // set our node ID
+     myNodeID += NodeID_Base;                            // set our node ID
 
     // Pin for onboard LED
     pinMode(OnBoardLed, OUTPUT);
@@ -396,7 +397,7 @@ void setup()
   debug1(PSTR(" %s \n\n"), compile_date);
   debug1(PSTR(" My Node ID: %u\n\n"), myNodeID);
 
-  printCpuResetCause();                   // this will tell us what causes CPU reset  
+  printCpuResetCause();                         // this will tell us what causes CPU reset  
   
   // set up ATD and reference, for ATD to use:
   // options --> AR_DEFAULT, AR_INTERNAL, AR_EXTERNAL, AR_INTERNAL1V0, AR_INTERNAL1V65, AR_INTERNAL2V23
