@@ -370,6 +370,7 @@ void before()
 }
 
 
+
 /* **************************************************************************** */
 /*                            Setup                                             */
 /* **************************************************************************** */
@@ -492,44 +493,36 @@ void presentation()
 
 /* **************************************************************************** 
  * 
- * Sends and print the cause of the last reset
+ * Send's and print the cause of the last reset
  * It uses the PM->RCAUSE register to detect the cause of the last reset.
  *
  * **************************************************************************** */
+
+
+static const char *ResetCause[] = {"POR", "BOD12", "BOD33", "", "External", "Watchdog", "Software"};
+ 
 void printCpuResetCause()
 {
-    debug1(PSTR("*** CPU reset by"));
+    unsigned int CauseIndex = 0; 
 
-    if (PM->RCAUSE.bit.SYST) {
-        debug1(PSTR(" Software"));
-    }
+    if (PM->RCAUSE.bit.SYST)  {CauseIndex = 6;}
 
     // Syntax error due to #define WDT in CMSIS/4.0.0-atmel/Device/ATMEL/samd21/include/samd21j18a.h
     // if (PM->RCAUSE.bit.WDT) {
-    if ((PM->RCAUSE.reg & PM_RCAUSE_WDT) != 0) {
+    if ((PM->RCAUSE.reg & PM_RCAUSE_WDT) != 0) {CauseIndex = 5;}
 
-        debug1(PSTR(" Watchdog"));
-    }
+    if (PM->RCAUSE.bit.EXT)   {CauseIndex = 4;}
 
-    if (PM->RCAUSE.bit.EXT) {
-        debug1(PSTR(" External"));
-    }
+    if (PM->RCAUSE.bit.BOD33) {CauseIndex = 2;}
 
-    if (PM->RCAUSE.bit.BOD33) {
-        debug1(PSTR(" BOD33"));
-    }
+    if (PM->RCAUSE.bit.BOD12) {CauseIndex = 1;}
 
-    if (PM->RCAUSE.bit.BOD12) {
-        debug1(PSTR(" BOD12"));
-    }
-
-    if (PM->RCAUSE.bit.POR) {
-        debug1(PSTR(" Power On Reset"));
-    }
-    char txtBuffer[30];
-    debug1((" [ %u ]\n"), PM->RCAUSE.reg);
-    sprintf(txtBuffer,"CPU Reset: [ %u ]\n", PM->RCAUSE.reg);
-
+    if (PM->RCAUSE.bit.POR)   {CauseIndex = 0;}
+    
+    char txtBuffer[40];
+    debug1(PSTR("*** CPU reset by %s [%u]\n"), ResetCause[CauseIndex], PM->RCAUSE.reg);
+    sprintf(txtBuffer,"Reset by %s [%u]", ResetCause[CauseIndex], PM->RCAUSE.reg);
+ 
     send(TextMsg.set(txtBuffer), AckFlag);  wait(SendDelay);        // sending reset info to controller
 }
 
