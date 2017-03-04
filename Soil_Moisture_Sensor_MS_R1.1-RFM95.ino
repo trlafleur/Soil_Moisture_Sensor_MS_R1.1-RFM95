@@ -754,7 +754,8 @@ void loop()
         {
           debug1(PSTR("\n*** Requesting Time\n")); 
           alarmUpdateFlag = false;
-          requestTime();                                       // Ask controller for time of day
+          requestTime();  wait(SendDelay);                      // Ask controller for time of day
+          wait (2000);
         }
 #endif
 
