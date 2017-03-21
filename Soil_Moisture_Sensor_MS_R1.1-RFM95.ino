@@ -494,10 +494,9 @@ void presentation()
 /* **************************************************************************** 
  * 
  * Send's and print the cause of the last reset
- * It uses the PM->RCAUSE register to detect the cause of the last reset.
+ * It uses the M0 PM->RCAUSE register to detect the cause of the last reset.
  *
  * **************************************************************************** */
-
 
 static const char *ResetCause[] = {"POR", "BOD12", "BOD33", "", "External", "Watchdog", "Software"};
  
@@ -694,8 +693,8 @@ void getTempDS3231()
 void getSoilTemp()
 {
   #if defined MyDS18B20
-    SoilTemp.requestTemperaturesByIndex( 0);                  // requestTemperaturesByAddress(0x44)  requestTemperaturesByIndex
-    temp = SoilTemp.getTempFByIndex( 0);
+    SoilTemp.requestTemperaturesByIndex( 0 );                  // requestTemperaturesByIndex
+    temp = SoilTemp.getTempFByIndex( 0 );
     if (temp > 150.0) temp = 150.0;                           // lets do a bounds check...
     if (temp < -32.0) temp = -32.0;
   
@@ -769,7 +768,7 @@ void loop()
       soilsensors(); 
       int vbat = analogRead(BattVolt);                        // we will do it twice, junk the 1st read
       vbat = analogRead(BattVolt);
-      float Vsys =  vbat * 0.000805664 * 1.97;                // read the battery voltage, 12bits = 0 -> 4095, divider is 1/2
+      float Vsys =  vbat * 0.000805664 * 1.97;                // read the battery voltage, 12bits = 0 -> 4095, divider is 1/2, so max = 6.6v
       send(VBAT.set(Vsys, 2), AckFlag);  wait(SendDelay);
       sendBatteryLevel(vbat/41);  wait (SendDelay);           // Send MySensor battery in %, count / 41 = 4095/41 = 99%
       floatMSB = Vsys * 100;                                  // we don't have floating point printing in debug print
@@ -811,7 +810,7 @@ void receive(const MyMessage &message)
     if  (message.type==V_VAR1)                                        // (24) This will received a new schedule time to send sensor data
       {
        unsigned long newSchedule = message.getULong();
-       debug2(PSTR("*** Received V_Var1 message gw: 0x%x\n"), newSchedule );
+       debug2(PSTR("*** Received V_Var1 message: 0x%x\n"), newSchedule );
        for (i=0; i< 23; i++) 
         {  
           MySendTime[i] = ((newSchedule >> i) & 0x00000001);
@@ -822,7 +821,7 @@ void receive(const MyMessage &message)
       {
         unsigned int flag = message.getUInt();
         if (flag == KeepAliveID) KeepAwakeFlag = true;          
-        debug2(PSTR("*** Received V_VAR2 message from gw: 0x%x\n"), flag );
+        debug2(PSTR("*** Received V_VAR2 message: 0x%x\n"), flag );
       }
     
      if ( message.type==V_VAR3)                                       // (26)
@@ -835,7 +834,6 @@ void receive(const MyMessage &message)
       {
         debug2(PSTR("*** Received V_VAR4 message from gw\n") );
       }
-
     }  // end if (message.sensor == CHILD_ID1 )
 
 
@@ -844,11 +842,11 @@ void receive(const MyMessage &message)
     {
       debug2(PSTR("*** Received Child ID-1 message from gw. \n"));
     }
-}
+}  // end of received()
 
 void receiveTime(unsigned long ts)
 {
-  debug1(PSTR("*** Received Time from gw: %u \n"), ts);
+  debug1(PSTR("*** Received Time from gw: %lu \n"), ts);
 
 #ifdef MyDS3231
   // Set from UNIX timestamp
