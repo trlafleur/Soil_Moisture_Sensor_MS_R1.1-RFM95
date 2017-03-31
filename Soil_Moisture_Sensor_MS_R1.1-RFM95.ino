@@ -35,6 +35,7 @@
  *  07-Jan-2017 1.1c  TRL - Adding Soil Temp Sensor
  *  14-feb-2017 1.1d  TRL - Adding time of day request
  *  02-Mar-2017 1.1e  TRL - Added KeepAwake code and message
+ *  22-Mar-2017 1.1f  TRL - Added calibration for sensor to % moisture
  *
  *  Notes:  1)  Tested with Arduino 1.8.1
  *          2)  Testing using RocketStream M0 with RFM95 & RFM95T
@@ -135,7 +136,7 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 #define MY_DEBUG2           // used in this program, level 2 debug
 
 #define SKETCHNAME      "Soil Moisture Sensor"
-#define SKETCHVERSION   "1.1e"
+#define SKETCHVERSION   "1.1f"
 
 /* ************************************************************************************** */
 /* Enable and select radio type attached, coding rate and frequency
@@ -152,11 +153,13 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 
 #define MY_RADIO_RFM95
 #define MY_RFM95_MODEM_CONFIGRUATION    RFM95_BW125CR45SF128
-#define MY_RFM95_TX_POWER               23 // max is 23
-//#define MY_RF95_TCXO                    // If using an RFM95 with a TCXO
+//#define MY_RFM95_MODEM_CONFIGRUATION    RFM95_BW125CR48SF4096
+
+#define MY_RFM95_TX_POWER               23      // max is 23
+//#define MY_RF95_TCXO                          // If using an RFM95 with a TCXO
 //#define MY_RFM95_ATC_MODE_DISABLED
 #define MY_RFM95_ATC_TARGET_RSSI        (-60)
-#define MY_RFM95_FREQUENCY              (928.5f)
+#define MY_RFM95_FREQUENCY              (918.5f)    // 928.5, 918.5
 
 #define SendDelay                       250       // this is the delay after each send
 #define AckFlag                         false     // if we are requesting an ACK from GW
@@ -396,7 +399,14 @@ void setup()
   
   const char compile_date[]  = __DATE__ ", " __TIME__;
   debug1(PSTR(" %s \n\n"), compile_date);
-  debug1(PSTR(" My Node ID: %u\n\n"), myNodeID);
+  debug1(PSTR(" My Node ID: %u\n"), myNodeID);
+
+
+  floatMSB = MY_RFM95_FREQUENCY * 100;
+  floatR = floatMSB % 100;
+  debug1(PSTR(" My Freq:  %0u.%02u MHz\n\n"), floatMSB/100, floatR);
+
+  
 
   printCpuResetCause();                         // this will tell us what causes CPU reset  
   
@@ -428,6 +438,7 @@ void setup()
   pinMode(MuxA, OUTPUT);  // Mux input A
   pinMode(MuxB, OUTPUT);  // Mux input B 
 #endif 
+
 
 /* ******** This setup the DS3231 and its alarms ********* */
 #if defined MyDS3231
@@ -786,7 +797,7 @@ void loop()
       systemSleep();                                           // ok, it bedtime, go to sleep
          // Ok, its wake up time....
       dt =  clock.getDateTime();                               // get current time from DS3231 
-      debug1(PSTR("\n*** Wakeing From Sleep at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);
+      debug1(PSTR("\n*** Waking From Sleep at: %u:%02u:%02u\n"), dt.hour, dt.minute, dt.second);
      }   
 #endif
                        
@@ -922,7 +933,8 @@ void soilsensors()
 int GetMoisture(unsigned long read)
 {
     // this equation changes based on calibration of sensors
-    int moisture = min( int( pow( read / 31.65 , 1.0 / -1.695 ) * 400 + 0.5 ) , 100 ); 
+    //int moisture = min( int( pow( read / 31.65 , 1.0 / -1.695 ) * 400 + 0.5 ) , 100 ); 
+      int moisture = min( int( pow( read1/396.37 , 1.0 / -1.644 ) * 100 + 0.5 ) , 100 );
     if (moisture < 0)   moisture = 0;
   //  if (moisture > 100) moisture = 100;
   return moisture;
