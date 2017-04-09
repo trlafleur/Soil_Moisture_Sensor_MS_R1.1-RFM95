@@ -77,7 +77,7 @@
 //#define MyWDT                 // if using the Watch Dog Timer
 #define MoistureSensor          // if using the Moisture Sensor, 4 channels
 #define MyDS3231                // if using the DS3231 RTC
-//#define SendHeartbeat           // if sending the heartbeat message
+//#define SendHeartbeat         // if sending the heartbeat message
 #define MY_SERIALDEVICE Serial  // this will override Serial port define in MyHwSAMD.h file
 
 /* ************************************************************************************** */
@@ -151,6 +151,9 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
  * | BW125CR48SF4096  | 0x78   | 0xC4   | 0x0C   | 125   | 4/8 | 4096 | Slow, long range      SF12
  */
 
+#define RFM95_BW125CR48SF512  RFM95_BW_125KHZ | RFM95_CODING_RATE_4_8, RFM95_SPREADING_FACTOR_512CPS | RFM95_RX_PAYLOAD_CRC_ON, RFM95_AGC_AUTO_ON | RFM95_LOW_DATA_RATE_OPTIMIZE  //!< 0x78,0xc4,0x0C   // trl <------
+#define RFM95_BW125CR48SF1024 RFM95_BW_125KHZ | RFM95_CODING_RATE_4_8, RFM95_SPREADING_FACTOR_1024CPS | RFM95_RX_PAYLOAD_CRC_ON, RFM95_AGC_AUTO_ON | RFM95_LOW_DATA_RATE_OPTIMIZE //!< 0x78,0xc4,0x0C
+
 #define MY_RADIO_RFM95
 #define MY_RFM95_MODEM_CONFIGRUATION    RFM95_BW125CR45SF128
 //#define MY_RFM95_MODEM_CONFIGRUATION    RFM95_BW125CR48SF4096
@@ -158,11 +161,11 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 #define MY_RFM95_TX_POWER               23      // max is 23
 //#define MY_RF95_TCXO                          // If using an RFM95 with a TCXO
 //#define MY_RFM95_ATC_MODE_DISABLED
-#define MY_RFM95_ATC_TARGET_RSSI        (-60)
-#define MY_RFM95_FREQUENCY              (918.5f)    // 928.5, 918.5
+#define MY_RFM95_ATC_TARGET_RSSI        (-70)
+#define MY_RFM95_FREQUENCY              (928.5f)    // 928.5, 918.5
 
 #define SendDelay                       250       // this is the delay after each send
-#define AckFlag                         false     // if we are requesting an ACK from GW
+#define AckFlag                         true     // if we are requesting an ACK from GW
 
 /* ************************************************************************************** */
 // Select correct defaults for the processor and board we are using
@@ -171,11 +174,13 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 //#define MY_RFM95_RST_PIN        0
 #define MY_RFM95_IRQ_PIN          2               // IRQ
 #define MY_RFM95_SPI_CS           5               // NSS
+
 #define MY_DEFAULT_TX_LED_PIN     12              // Led's on the board
 #define MY_DEFAULT_ERR_LED_PIN    10
 #define MY_DEFAULT_RX_LED_PIN     11
 #define OnBoardLed                13              // CPU Led
 #define MY_WITH_LEDS_BLINKING_INVERSE
+
 #define MY_OTA_FLASH_SS            4              // Flash chip on processor
 #define MY_OTA_FLASH_JDECID       0x1F65          // Rocket M0?? 0x0101??
 
@@ -186,6 +191,7 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 #else
   #error ********* Processor not defined, Requires an ARM M0 SAMD21G18A
 #endif
+
 /* ************************************************************************************** */
 
 //#define MY_REPEATER_FEATURE
@@ -195,8 +201,6 @@ bool MySendTime[24] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 #define NodeID_Base          20         // My Node ID base... this plus IDx bits
 int myNodeID =                0;        // Set at run time from jumpers on PCB
 #define MY_NODE_ID myNodeID             // Set at run time from jumpers
-
-#define MY_PARENT_NODE_ID     0         // GW ID
 
 #define CHILD_ID0             0         // Id of my Sensor
 #define CHILD_ID1             1         // Id of my Water sensor child
@@ -304,13 +308,13 @@ static float humi, temp;                          // used by Si7021, MCP9800, DS
 /* ************************************************************************************** */
 
 /* Pin assigments for Moisture Mux */
-#define SensDY  15
-#define SensDX  17
-#define SensAY  A0  
-#define SensAX  A2  
-#define MuxA     8
-#define MuxB     7
-#define MuxINH   9
+#define SensDY      15
+#define SensDX      17
+#define SensAY      A0  
+#define SensAX      A2  
+#define MuxA        8
+#define MuxB        7
+#define MuxINH      9
 
 typedef struct {                  // Structure to be used in percentage and resistance values matrix to be filtered (have to be in pairs)
   int moisture;
@@ -318,7 +322,7 @@ typedef struct {                  // Structure to be used in percentage and resi
 } values;
 
 // Setting up format for reading 4 soil sensors
-#define NUM_READS 12              // Number of sensor reads for filtering
+#define NUM_READS     12          // Number of sensor reads for filtering
 
 const long knownResistor = 4700;  // Value of reference resistors in ohms, = reference for sensor
 
@@ -330,7 +334,7 @@ int zeroCalibration = 138;        // calibrate sensor resistance to zero when in
 values valueOf[NUM_READS];        // Calculated  resistances to be averaged
 long buffer[NUM_READS];
 int index2 = 0;
-int i=0;                            // Simple index variable
+int i=0;                          // Simple index variable
 int j=0;                          // Simple index variable
 
 long resistance = 0;
@@ -407,7 +411,6 @@ void setup()
   debug1(PSTR(" My Freq:  %0u.%02u MHz\n\n"), floatMSB/100, floatR);
 
   
-
   printCpuResetCause();                         // this will tell us what causes CPU reset  
   
   // set up ATD and reference, for ATD to use:
@@ -452,7 +455,7 @@ void setup()
   clock.clearAlarm1();
   clock.clearAlarm2();
 
-  // Set sketch compiling time to the DS3231
+  // Set sketch compiling time to the DS3231 RTC
   debug1(PSTR("*** Setting Time on DS3231 \n"));
   clock.setDateTime(__DATE__, __TIME__);
 
@@ -812,17 +815,36 @@ void loop()
  * ***************************************************************** */
 void receive(const MyMessage &message) 
 {
-   debug2(PSTR("*** Received message from gw:\n"));
-   //debug2(PSTR("Last: %u, Sender: %u, Dest: %u, Type: %u, Sensor: %u\n"), message.last, message.sender, message.destination, message.type, message.sensor);
-   
+//   debug2(PSTR("*** Received message from gw:\n"));
+//   debug2(PSTR("*** Last: %u, Sender: %u, Dest: %u, Length: 0x%02x, Ack: 0x%02x, Type: %u, Child ID: %u\n"), message.last, message.sender, message.destination, message.version_length, message.command_ack_payload, message.type, message.sensor);
+//
+//  uint8_t AckCmd =   (message.command_ack_payload &  0b00000111);
+//  uint8_t AckReq =   ( (message.command_ack_payload &  0b00001000) >> 3);
+//  uint8_t AckAck =   ( (message.command_ack_payload &  0b00010000) >> 4);
+//  uint8_t AckType =  ( (message.command_ack_payload &  0b11100000) >> 5);
+//  debug2(PSTR("*** Ack Cmd: 0x%02x, Ack Req: 0x%01x, Ack: 0x%01x, Ack Type: 0x%02x\n"), AckCmd, AckReq, AckAck, AckType);
+//
+//  uint8_t LenVer = (message.version_length & 0b00000011);
+//  uint8_t LenSgn = ( (message.version_length & 0b00000100) >> 2);
+//  uint8_t LenLen = ( (message.version_length & 0b11111000) >> 3);
+//  debug2(PSTR("*** Ver: 0x%02x, Signing Flag: 0x%01x, Length: 0x%02x,\n"), LenVer, LenSgn, LenLen);
+
+if (message.command_ack_payload & 0b00010000)                       // check to see if this is an ACK, if it is, return
+    {
+      //debug2(PSTR("*** Received ACK from GW:\n"));
+    return;
+    }
+    
+  
 // Make sure its for our child ID
   if (message.sensor == CHILD_ID0 )
   {
     if  (message.type==V_VAR1)                                        // (24) This will received a new schedule time to send sensor data
       {
        unsigned long newSchedule = message.getULong();
-       debug2(PSTR("*** Received V_Var1 message: 0x%x\n"), newSchedule );
-       for (i=0; i< 23; i++) 
+       debug2(PSTR("*** Received V_Var1, newSchedule message: 0x%02x\n"), newSchedule );
+       
+       for (i=0; i< 23; i++)                                          // set MySendTime from newSchedule
         {  
           MySendTime[i] = ((newSchedule >> i) & 0x00000001);
         }          
@@ -831,8 +853,8 @@ void receive(const MyMessage &message)
      if ( message.type==V_VAR2)                                       // (25) This will received a "do not sleep flag", that keep us awake until noon each day
       {
         unsigned int flag = message.getUInt();
-        if (flag == KeepAliveID) KeepAwakeFlag = true;          
-        debug2(PSTR("*** Received V_VAR2 message: 0x%x\n"), flag );
+        if (flag == KeepAliveID) KeepAwakeFlag = true;                // check for special ID      
+        debug2(PSTR("*** Received V_VAR2, Keep Awake message: 0x%02x\n"), flag );
       }
     
      if ( message.type==V_VAR3)                                       // (26)
@@ -855,6 +877,8 @@ void receive(const MyMessage &message)
     }
 }  // end of received()
 
+
+/* ***************************************************************** */
 void receiveTime(unsigned long ts)
 {
   debug1(PSTR("*** Received Time from gw: %lu \n"), ts);
@@ -933,10 +957,10 @@ void soilsensors()
 int GetMoisture(unsigned long read)
 {
     // this equation changes based on calibration of sensors
-    //int moisture = min( int( pow( read / 31.65 , 1.0 / -1.695 ) * 400 + 0.5 ) , 100 ); 
-      int moisture = min( int( pow( read1/396.37 , 1.0 / -1.644 ) * 100 + 0.5 ) , 100 );
+    //int moisture = min( int( pow( read /  31.65 , 1.0 / -1.695 ) * 400 + 0.5 ) , 100 ); 
+      int moisture = min( int( pow( read / 396.37 , 1.0 / -1.644 ) * 100 + 0.5 ) , 100 );
     if (moisture < 0)   moisture = 0;
-  //  if (moisture > 100) moisture = 100;
+    if (moisture > 100) moisture = 100;
   return moisture;
 }
 
